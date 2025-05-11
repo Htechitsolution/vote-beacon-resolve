@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import Navigation from "@/components/layout/Navigation";
 import SuperAdminRole from "@/components/SuperAdminRole";
 import {
   Breadcrumb,
@@ -108,92 +110,96 @@ const SuperAdmin = () => {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-6xl">
-      <Breadcrumb className="mb-4">
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink>
-              <Link to="/">Home</Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbLink>
-              <Link to="/projects">Projects</Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage>Super Admin Dashboard</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
+    <div>
+      <Navigation />
       
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">User Management</h1>
-          <p className="text-gray-600 mt-1">Manage all registered users</p>
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
+        <Breadcrumb className="mb-4">
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink>
+                <Link to="/">Home</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbLink>
+                <Link to="/projects">Projects</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>Super Admin Dashboard</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+        
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+          <div>
+            <h1 className="text-3xl font-bold">User Management</h1>
+            <p className="text-gray-600 mt-1">Manage all registered users</p>
+          </div>
+          
+          <Button className="bg-evoting-600 hover:bg-evoting-700 text-white" asChild>
+            <Link to="/projects">Back to Projects</Link>
+          </Button>
         </div>
         
-        <Button className="bg-evoting-600 hover:bg-evoting-700 text-white" asChild>
-          <Link to="/projects">Back to Projects</Link>
-        </Button>
-      </div>
-      
-      <div className="mb-8">
-        <SuperAdminRole />
-      </div>
-      
-      <div className="mb-8 relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-        <Input 
-          className="pl-10"
-          placeholder="Search users by name, email or company..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
-      </div>
-      
-      {loading ? (
-        <div className="flex justify-center py-10">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-evoting-600"></div>
+        <div className="mb-8">
+          <SuperAdminRole />
         </div>
-      ) : (
-        <div className="border rounded-lg overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead className="hidden md:table-cell">Company</TableHead>
-                <TableHead className="hidden md:table-cell">Joined</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredUsers.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell className="font-medium">{user.name}</TableCell>
-                  <TableCell>{user.email}</TableCell>
-                  <TableCell className="hidden md:table-cell">{user.company_name || '-'}</TableCell>
-                  <TableCell className="hidden md:table-cell">{formatDate(user.created_at)}</TableCell>
-                  <TableCell>{getStatusBadge(user.role)}</TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="outline" size="sm">View</Button>
-                  </TableCell>
+        
+        <div className="mb-8 relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+          <Input 
+            className="pl-10"
+            placeholder="Search users by name, email or company..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+        
+        {loading ? (
+          <div className="flex justify-center py-10">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-evoting-600"></div>
+          </div>
+        ) : (
+          <div className="border rounded-lg overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead className="hidden md:table-cell">Company</TableHead>
+                  <TableHead className="hidden md:table-cell">Joined</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      )}
-      
-      {!loading && filteredUsers.length === 0 && (
-        <div className="text-center py-10">
-          <p className="text-gray-500">No users found matching your search.</p>
-        </div>
-      )}
+              </TableHeader>
+              <TableBody>
+                {filteredUsers.map((user) => (
+                  <TableRow key={user.id}>
+                    <TableCell className="font-medium">{user.name}</TableCell>
+                    <TableCell>{user.email}</TableCell>
+                    <TableCell className="hidden md:table-cell">{user.company_name || '-'}</TableCell>
+                    <TableCell className="hidden md:table-cell">{formatDate(user.created_at)}</TableCell>
+                    <TableCell>{getStatusBadge(user.role)}</TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="outline" size="sm">View</Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+        
+        {!loading && filteredUsers.length === 0 && (
+          <div className="text-center py-10">
+            <p className="text-gray-500">No users found matching your search.</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

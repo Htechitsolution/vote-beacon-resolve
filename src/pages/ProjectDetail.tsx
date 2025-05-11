@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -7,6 +8,7 @@ import { Plus, Search, Calendar, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import Navigation from "@/components/layout/Navigation";
 import {
   Dialog,
   DialogContent,
@@ -40,6 +42,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { format } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
@@ -69,11 +78,15 @@ type Agenda = {
 const agendaFormSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().optional(),
-  start_date: z.date({ required_error: "Start date is required" }),
-  end_date: z.date({ required_error: "End date is required" }),
+});
+
+// Form schema for updating project status
+const projectStatusFormSchema = z.object({
+  status: z.string().min(1, "Status is required"),
 });
 
 type AgendaFormValues = z.infer<typeof agendaFormSchema>;
+type ProjectStatusValues = z.infer<typeof projectStatusFormSchema>;
 
 const VotingSummary = ({ projectId }: { projectId: string }) => {
   const [votingStats, setVotingStats] = useState({
@@ -178,17 +191,25 @@ const AgendaCard = ({ agenda }: { agenda: Agenda }) => {
         </p>
         
         <div className="space-y-2">
-          <div className="flex items-center text-sm">
-            <Calendar className="h-4 w-4 mr-2 text-gray-500" />
-            <span className="text-gray-700 font-medium">Start:</span>
-            <span className="ml-2 text-gray-600">{formatDateTime(agenda.start_date)}</span>
-          </div>
-          
-          <div className="flex items-center text-sm">
-            <Clock className="h-4 w-4 mr-2 text-gray-500" />
-            <span className="text-gray-700 font-medium">End:</span>
-            <span className="ml-2 text-gray-600">{formatDateTime(agenda.end_date)}</span>
-          </div>
+          {(agenda.start_date || agenda.end_date) && (
+            <>
+              {agenda.start_date && (
+                <div className="flex items-center text-sm">
+                  <Calendar className="h-4 w-4 mr-2 text-gray-500" />
+                  <span className="text-gray-700 font-medium">Start:</span>
+                  <span className="ml-2 text-gray-600">{formatDateTime(agenda.start_date)}</span>
+                </div>
+              )}
+              
+              {agenda.end_date && (
+                <div className="flex items-center text-sm">
+                  <Clock className="h-4 w-4 mr-2 text-gray-500" />
+                  <span className="text-gray-700 font-medium">End:</span>
+                  <span className="ml-2 text-gray-600">{formatDateTime(agenda.end_date)}</span>
+                </div>
+              )}
+            </>
+          )}
         </div>
       </CardContent>
       <div className="px-6 py-4 border-t">
@@ -209,7 +230,8 @@ const ProjectDetail = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const { user } = useAuth();
+  const [statusDialogOpen, setStatusDialogOpen] = useState(false);
+  const { user, profile } = useAuth();
   const navigate = useNavigate();
   
   const form = useForm<AgendaFormValues>({
@@ -219,6 +241,13 @@ const ProjectDetail = () => {
       description: "",
     },
   });
+  
+  const statusForm = useForm<ProjectStatusValues>({
+    resolver: zodResolver(projectStatusFormSchema),
+    defaultValues: {
+      status: "",
+    },
+  });
 
   useEffect(() => {
     if (projectId) {
@@ -226,6 +255,12 @@ const ProjectDetail = () => {
       fetchAgendas();
     }
   }, [projectId]);
+  
+  useEffect(() => {
+    if (project) {
+      statusForm.setValue("status", project.status);
+    }
+  }, [project, statusForm]);
 
   const fetchProject = async () => {
     try {
@@ -287,8 +322,6 @@ const ProjectDetail = () => {
             title: values.title,
             description: values.description || null,
             project_id: projectId,
-            start_date: values.start_date.toISOString(),
-            end_date: values.end_date.toISOString(),
             status: 'draft',
             voting_type: 'single_choice'
           }
@@ -306,6 +339,26 @@ const ProjectDetail = () => {
     } catch (error: any) {
       console.error("Error creating agenda:", error.message);
       toast.error(error.message || "Failed to create voting");
+    }
+  };
+  
+  const handleUpdateStatus = async (values: ProjectStatusValues) => {
+    try {
+      if (!projectId) return;
+      
+      const { error } = await supabase
+        .from('projects')
+        .update({ status: values.status })
+        .eq('id', projectId);
+        
+      if (error) throw error;
+      
+      toast.success(`Project status updated to ${values.status}`);
+      fetchProject();
+      setStatusDialogOpen(false);
+    } catch (error: any) {
+      console.error("Error updating project status:", error.message);
+      toast.error(error.message || "Failed to update project status");
     }
   };
   
@@ -327,160 +380,135 @@ const ProjectDetail = () => {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-6xl">
-      <Breadcrumb className="mb-4">
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink>
-              <Link to="/">Home</Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbLink>
-              <Link to="/projects">Projects</Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage>{project?.title || "Project Details"}</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
+    <div>
+      <Navigation />
+      
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
+        <Breadcrumb className="mb-4">
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink>
+                <Link to="/">Home</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbLink>
+                <Link to="/projects">Projects</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>{project?.title || "Project Details"}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
 
-      {loading && !project ? (
-        <div className="flex justify-center py-20">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-evoting-600"></div>
-        </div>
-      ) : (
-        <>
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <h1 className="text-3xl font-bold">{project?.title}</h1>
-              <p className="text-gray-600 mt-1">{project?.description || "No description provided."}</p>
-              <p className="text-sm text-gray-500 mt-2">
-                Created on {new Date(project?.created_at || "").toLocaleDateString()}
-              </p>
+        {loading && !project ? (
+          <div className="flex justify-center py-20">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-evoting-600"></div>
+          </div>
+        ) : (
+          <>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
+              <div>
+                <div className="flex items-center gap-3">
+                  <h1 className="text-3xl font-bold">{project?.title}</h1>
+                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                    project?.status === 'active' ? 'bg-green-100 text-green-800' :
+                    project?.status === 'completed' ? 'bg-blue-100 text-blue-800' :
+                    'bg-yellow-100 text-yellow-800'
+                  }`}>
+                    {project?.status.charAt(0).toUpperCase() + project?.status.slice(1)}
+                  </span>
+                </div>
+                <p className="text-gray-600 mt-1">{project?.description || "No description provided."}</p>
+                
+                <div className="flex items-center gap-3 mt-2">
+                  <p className="text-sm text-gray-500">
+                    Created on {new Date(project?.created_at || "").toLocaleDateString()}
+                  </p>
+                  
+                  {profile && (
+                    <span className="px-2 py-1 bg-gray-100 rounded-full text-xs font-medium capitalize">
+                      {profile.role.replace('_', ' ')}
+                    </span>
+                  )}
+                </div>
+              </div>
+              
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setStatusDialogOpen(true)}
+                >
+                  Update Status
+                </Button>
+                
+                <Button 
+                  className="bg-evoting-600 hover:bg-evoting-700 text-white"
+                  onClick={() => setCreateDialogOpen(true)}
+                >
+                  <Plus className="mr-2 h-4 w-4" /> New Voting
+                </Button>
+              </div>
             </div>
             
-            <Button 
-              className="bg-evoting-600 hover:bg-evoting-700 text-white"
-              onClick={() => setCreateDialogOpen(true)}
-            >
-              <Plus className="mr-2 h-4 w-4" /> New Voting
-            </Button>
-          </div>
-          
-          <VotingSummary projectId={projectId || ""} />
-          
-          <div className="mb-8 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-            <Input 
-              className="pl-10"
-              placeholder="Search votings..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-          
-          {loading ? (
-            <div className="flex justify-center py-10">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-evoting-600"></div>
+            <VotingSummary projectId={projectId || ""} />
+            
+            <div className="mb-8 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+              <Input 
+                className="pl-10"
+                placeholder="Search votings..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
             </div>
-          ) : filteredAgendas.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {filteredAgendas.map((agenda) => (
-                <AgendaCard key={agenda.id} agenda={agenda} />
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-10">
-              <p className="text-gray-500 mb-4">No votings found for this project.</p>
-              <Button 
-                className="bg-evoting-600 hover:bg-evoting-700 text-white"
-                onClick={() => setCreateDialogOpen(true)}
-              >
-                <Plus className="mr-2 h-4 w-4" /> Create your first voting
-              </Button>
-            </div>
-          )}
+            
+            {loading ? (
+              <div className="flex justify-center py-10">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-evoting-600"></div>
+              </div>
+            ) : filteredAgendas.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {filteredAgendas.map((agenda) => (
+                  <AgendaCard key={agenda.id} agenda={agenda} />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-10">
+                <p className="text-gray-500 mb-4">No votings found for this project.</p>
+                <Button 
+                  className="bg-evoting-600 hover:bg-evoting-700 text-white"
+                  onClick={() => setCreateDialogOpen(true)}
+                >
+                  <Plus className="mr-2 h-4 w-4" /> Create your first voting
+                </Button>
+              </div>
+            )}
 
-          {/* Create Agenda Dialog */}
-          <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-            <DialogContent className="sm:max-w-[500px]">
-              <DialogHeader>
-                <DialogTitle>Create New Voting</DialogTitle>
-                <DialogDescription>
-                  Set up a new voting session for this project.
-                </DialogDescription>
-              </DialogHeader>
-              
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(handleCreateAgenda)} className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="title"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Voting Title</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter voting title..." {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="description"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Description (Optional)</FormLabel>
-                        <FormControl>
-                          <Textarea 
-                            placeholder="Enter voting description..." 
-                            {...field} 
-                            rows={3}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <div className="grid grid-cols-2 gap-4">
+            {/* Create Agenda Dialog */}
+            <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+              <DialogContent className="sm:max-w-[500px]">
+                <DialogHeader>
+                  <DialogTitle>Create New Voting</DialogTitle>
+                  <DialogDescription>
+                    Set up a new voting session for this project.
+                  </DialogDescription>
+                </DialogHeader>
+                
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(handleCreateAgenda)} className="space-y-4">
                     <FormField
                       control={form.control}
-                      name="start_date"
+                      name="title"
                       render={({ field }) => (
-                        <FormItem className="flex flex-col">
-                          <FormLabel>Start Date</FormLabel>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <FormControl>
-                                <Button
-                                  variant={"outline"}
-                                  className={`w-full pl-3 text-left font-normal ${!field.value && "text-muted-foreground"}`}
-                                >
-                                  {field.value ? (
-                                    format(field.value, "PPP")
-                                  ) : (
-                                    <span>Pick a date</span>
-                                  )}
-                                  <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                </Button>
-                              </FormControl>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <CalendarComponent
-                                mode="single"
-                                selected={field.value}
-                                onSelect={field.onChange}
-                                disabled={(date) => date < new Date()}
-                              />
-                            </PopoverContent>
-                          </Popover>
+                        <FormItem>
+                          <FormLabel>Voting Title</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Enter voting title..." {...field} />
+                          </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -488,58 +516,89 @@ const ProjectDetail = () => {
                     
                     <FormField
                       control={form.control}
-                      name="end_date"
+                      name="description"
                       render={({ field }) => (
-                        <FormItem className="flex flex-col">
-                          <FormLabel>End Date</FormLabel>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <FormControl>
-                                <Button
-                                  variant={"outline"}
-                                  className={`w-full pl-3 text-left font-normal ${!field.value && "text-muted-foreground"}`}
-                                >
-                                  {field.value ? (
-                                    format(field.value, "PPP")
-                                  ) : (
-                                    <span>Pick a date</span>
-                                  )}
-                                  <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                </Button>
-                              </FormControl>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <CalendarComponent
-                                mode="single"
-                                selected={field.value}
-                                onSelect={field.onChange}
-                                disabled={(date) => {
-                                  const startDate = form.getValues("start_date");
-                                  return startDate && date < startDate;
-                                }}
-                              />
-                            </PopoverContent>
-                          </Popover>
+                        <FormItem>
+                          <FormLabel>Description (Optional)</FormLabel>
+                          <FormControl>
+                            <Textarea 
+                              placeholder="Enter voting description..." 
+                              {...field} 
+                              rows={3}
+                            />
+                          </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
-                  </div>
-                  
-                  <DialogFooter>
-                    <Button type="button" variant="outline" onClick={() => setCreateDialogOpen(false)}>
-                      Cancel
-                    </Button>
-                    <Button type="submit" className="bg-evoting-600 hover:bg-evoting-700 text-white">
-                      Create Voting
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
-        </>
-      )}
+                    
+                    <DialogFooter>
+                      <Button type="button" variant="outline" onClick={() => setCreateDialogOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button type="submit" className="bg-evoting-600 hover:bg-evoting-700 text-white">
+                        Create Voting
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+            
+            {/* Update Project Status Dialog */}
+            <Dialog open={statusDialogOpen} onOpenChange={setStatusDialogOpen}>
+              <DialogContent className="sm:max-w-[400px]">
+                <DialogHeader>
+                  <DialogTitle>Update Project Status</DialogTitle>
+                  <DialogDescription>
+                    Change the current status of this project.
+                  </DialogDescription>
+                </DialogHeader>
+                
+                <Form {...statusForm}>
+                  <form onSubmit={statusForm.handleSubmit(handleUpdateStatus)} className="space-y-4">
+                    <FormField
+                      control={statusForm.control}
+                      name="status"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Project Status</FormLabel>
+                          <Select
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                            value={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select project status" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="draft">Draft</SelectItem>
+                              <SelectItem value="active">Active</SelectItem>
+                              <SelectItem value="completed">Completed</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <DialogFooter>
+                      <Button type="button" variant="outline" onClick={() => setStatusDialogOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button type="submit" className="bg-evoting-600 hover:bg-evoting-700 text-white">
+                        Update Status
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+          </>
+        )}
+      </div>
     </div>
   );
 };

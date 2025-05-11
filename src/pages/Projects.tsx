@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +8,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import Navigation from "@/components/layout/Navigation";
 import {
   Dialog,
   DialogContent,
@@ -14,6 +16,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Form,
@@ -27,6 +30,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -52,6 +62,7 @@ type Project = {
 const projectFormSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().optional(),
+  status: z.string().default('draft'),
 });
 
 type ProjectFormValues = z.infer<typeof projectFormSchema>;
@@ -124,7 +135,7 @@ const ProjectCard = ({ project }: { project: Project }) => {
         return "bg-green-100 text-green-800";
       case "completed":
         return "bg-blue-100 text-blue-800";
-      case "upcoming":
+      case "draft":
         return "bg-yellow-100 text-yellow-800";
       default:
         return "bg-gray-100 text-gray-800";
@@ -148,12 +159,6 @@ const ProjectCard = ({ project }: { project: Project }) => {
             <Calendar className="inline-block mr-1 h-4 w-4" />
             Created: {new Date(project.created_at).toLocaleDateString()}
           </p>
-          {project.admin && (
-            <p className="text-sm text-gray-500">
-              Admin: {project.admin.name}
-              {project.admin.company_name && ` (${project.admin.company_name})`}
-            </p>
-          )}
         </div>
       </CardContent>
       <CardFooter className="border-t pt-4">
@@ -181,6 +186,7 @@ const Projects = () => {
     defaultValues: {
       title: "",
       description: "",
+      status: "draft",
     },
   });
 
@@ -228,7 +234,7 @@ const Projects = () => {
             title: values.title,
             description: values.description || null,
             admin_id: user.id,
-            status: 'draft'
+            status: values.status || 'draft'
           }
         ])
         .select();
@@ -253,129 +259,168 @@ const Projects = () => {
   );
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-6xl">
-      <Breadcrumb className="mb-4">
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink>
-              <Link to="/">Home</Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage>Projects</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
+    <div>
+      <Navigation />
+      
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
+        <Breadcrumb className="mb-4">
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink>
+                <Link to="/">Home</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>Projects</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
 
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold">Your Projects</h1>
-        
-        <div className="flex items-center gap-4">
-          {isSuper && (
-            <Button variant="outline" asChild>
-              <Link to="/admin/dashboard">Super Admin</Link>
-            </Button>
-          )}
-          <Button 
-            className="bg-evoting-600 hover:bg-evoting-700 text-white"
-            onClick={() => setCreateDialogOpen(true)}
-          >
-            <Plus className="mr-2 h-4 w-4" /> New Project
-          </Button>
-        </div>
-      </div>
-      
-      <ProjectSummary />
-      
-      <div className="mb-8 relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-        <Input 
-          className="pl-10"
-          placeholder="Search projects..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
-      </div>
-      
-      {loading ? (
-        <div className="flex justify-center py-20">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-evoting-600"></div>
-        </div>
-      ) : filteredProjects.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredProjects.map((project) => (
-            <ProjectCard key={project.id} project={project} />
-          ))}
-        </div>
-      ) : (
-        <div className="text-center py-20">
-          <p className="text-gray-500 mb-4">No projects found matching your search.</p>
-          <Button 
-            className="bg-evoting-600 hover:bg-evoting-700 text-white"
-            onClick={() => setCreateDialogOpen(true)}
-          >
-            <Plus className="mr-2 h-4 w-4" /> Create your first project
-          </Button>
-        </div>
-      )}
-
-      {/* Create Project Dialog */}
-      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create New Project</DialogTitle>
-            <DialogDescription>
-              Add a new project to your dashboard.
-            </DialogDescription>
-          </DialogHeader>
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-3xl font-bold">Your Projects</h1>
+            {profile && (
+              <p className="text-gray-600 mt-1">
+                <span className="px-2 py-1 bg-gray-100 rounded-full text-xs font-medium capitalize">
+                  {profile.role.replace('_', ' ')}
+                </span>
+              </p>
+            )}
+          </div>
           
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleCreateProject)} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="title"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Project Title</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter project title..." {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Description (Optional)</FormLabel>
-                    <FormControl>
-                      <Textarea 
-                        placeholder="Enter project description..." 
-                        {...field} 
-                        rows={3}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setCreateDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit" className="bg-evoting-600 hover:bg-evoting-700 text-white">
-                  Create Project
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
+          <div className="flex items-center gap-4">
+            {isSuper && (
+              <Button variant="outline" asChild>
+                <Link to="/admin/dashboard">Super Admin</Link>
+              </Button>
+            )}
+            <Button 
+              className="bg-evoting-600 hover:bg-evoting-700 text-white"
+              onClick={() => setCreateDialogOpen(true)}
+            >
+              <Plus className="mr-2 h-4 w-4" /> New Project
+            </Button>
+          </div>
+        </div>
+        
+        <ProjectSummary />
+        
+        <div className="mb-8 relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+          <Input 
+            className="pl-10"
+            placeholder="Search projects..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+        
+        {loading ? (
+          <div className="flex justify-center py-20">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-evoting-600"></div>
+          </div>
+        ) : filteredProjects.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredProjects.map((project) => (
+              <ProjectCard key={project.id} project={project} />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-20">
+            <p className="text-gray-500 mb-4">No projects found matching your search.</p>
+            <Button 
+              className="bg-evoting-600 hover:bg-evoting-700 text-white"
+              onClick={() => setCreateDialogOpen(true)}
+            >
+              <Plus className="mr-2 h-4 w-4" /> Create your first project
+            </Button>
+          </div>
+        )}
+
+        {/* Create Project Dialog */}
+        <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create New Project</DialogTitle>
+              <DialogDescription>
+                Add a new project to your dashboard.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(handleCreateProject)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="title"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Project Title</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter project title..." {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description (Optional)</FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          placeholder="Enter project description..." 
+                          {...field} 
+                          rows={3}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="status"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Status</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select project status" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="draft">Draft</SelectItem>
+                          <SelectItem value="active">Active</SelectItem>
+                          <SelectItem value="completed">Completed</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setCreateDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" className="bg-evoting-600 hover:bg-evoting-700 text-white">
+                    Create Project
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+      </div>
     </div>
   );
 };
