@@ -57,8 +57,10 @@ type Vote = {
   id: string;
   option_id: string;
   voter_id: string;
-  value: string;
+  value: string;  // This was missing and caused the type error
   voting_weight: number;
+  agenda_id: string;
+  created_at: string;
 };
 
 type VoteResult = {
@@ -121,7 +123,7 @@ const AgendaResults = () => {
       if (optionsError) throw optionsError;
       setOptions(optionsData || []);
 
-      // Fetch votes (in a real app, this would be more efficiently done with a database view or function)
+      // Fetch votes with the correct schema
       const { data: votesData, error: votesError } = await supabase
         .from('votes')
         .select('*')
@@ -129,8 +131,11 @@ const AgendaResults = () => {
 
       if (votesError) throw votesError;
       
+      // Make sure the votes data has the correct structure
+      const validVotes = (votesData || []).filter(vote => vote.value !== undefined);
+      
       // Calculate results
-      calculateResults(optionsData || [], votesData || []);
+      calculateResults(optionsData || [], validVotes);
       
     } catch (error: any) {
       console.error("Error fetching data:", error.message);
@@ -251,11 +256,11 @@ const AgendaResults = () => {
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
-              <Link to={`/projects/${projectId}`}>{project.title}</Link>
+              <Link to={`/projects/${projectId}`}>{project?.title}</Link>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
-              <Link to={`/projects/${projectId}/agenda/${agendaId}`}>{agenda.title}</Link>
+              <Link to={`/projects/${projectId}/agenda/${agendaId}`}>{agenda?.title}</Link>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>Results</BreadcrumbItem>
@@ -265,8 +270,8 @@ const AgendaResults = () => {
         <div className="mb-6">
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-3xl font-bold mb-2">{agenda.title} - Results</h1>
-              <p className="text-gray-600">{agenda.description}</p>
+              <h1 className="text-3xl font-bold mb-2">{agenda?.title} - Results</h1>
+              <p className="text-gray-600">{agenda?.description}</p>
             </div>
             <Button variant="outline" asChild>
               <Link to={`/projects/${projectId}/agenda/${agendaId}`}>
