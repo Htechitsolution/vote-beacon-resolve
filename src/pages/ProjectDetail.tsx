@@ -113,16 +113,15 @@ const fetchProject = async () => {
     
     if (error) throw error;
     
-    // Create a properly typed Project object with all required fields
+    // Make sure we properly map the data to our Project interface
     const projectData: Project = {
       id: data.id,
       title: data.title,
       description: data.description,
-      // @ts-ignore
-      status: data.status,
+      status: data.status || 'draft',
       created_at: data.created_at,
       updated_at: data.updated_at,
-      // Check if start_date and end_date exist in the data, otherwise set to null
+      // Explicitly check if these properties exist in the data
       start_date: data.start_date || null,
       end_date: data.end_date || null,
       admin_id: data.admin_id
