@@ -1,7 +1,7 @@
 
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { User, LogOut, Menu, ChevronDown } from "lucide-react";
+import { User, LogOut, Menu, ChevronDown, Vote } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -28,6 +28,7 @@ const Navigation = () => {
       <div className="container mx-auto flex items-center justify-between">
         <div className="flex items-center gap-6">
           <Link to="/" className="flex items-center gap-2">
+            <Vote className="h-8 w-8 text-evoting-800" />
             <span className="text-xl font-bold bg-clip-text text-evoting-800">
               The-Evoting
             </span>
@@ -47,13 +48,7 @@ const Navigation = () => {
 
         {user ? (
           <div className="flex items-center gap-4">
-            <span className="hidden md:inline-block text-sm text-gray-500">
-              {profile?.role && (
-                <span className="px-2 py-1 bg-gray-100 rounded-full text-xs font-medium capitalize">
-                  {profile.role.replace('_', ' ')}
-                </span>
-              )}
-            </span>
+            {/* Removed role badge as requested */}
             
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

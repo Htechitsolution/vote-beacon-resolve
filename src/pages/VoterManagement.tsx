@@ -16,7 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { X, Search, Users, Percent } from "lucide-react";
+import { X, Search, Users, Percent, Trash2 } from "lucide-react";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -34,7 +34,6 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Badge } from "@/components/ui/badge";
 
 interface Voter {
   id: string;
@@ -272,16 +271,12 @@ const VoterManagement = () => {
             <p className="text-gray-600">
               Add and manage voters for {agenda ? `agenda: ${agenda.title}` : `project: ${project?.title}`}
             </p>
-            {profile?.role && (
-              <Badge variant="outline" className="mt-2 capitalize">
-                {profile.role.replace('_', ' ')}
-              </Badge>
-            )}
+            {/* Removed admin badge as requested */}
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card className="md:col-span-2">
+        <div className="mb-8">
+          <Card className="w-full">
             <CardHeader>
               <CardTitle className="text-lg">Registration Summary</CardTitle>
             </CardHeader>
@@ -311,87 +306,95 @@ const VoterManagement = () => {
                   </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Add New Voter</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(addVoter)} className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Voter name" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Email address" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="company_name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Company Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Company name (optional)" {...field} value={field.value || ""} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="voting_weight"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Voting Weight (%)</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="number" 
-                            min="0.01"
-                            max="100"
-                            step="0.01"
-                            placeholder="1" 
-                            {...field} 
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <Button 
-                    type="submit" 
-                    className="w-full bg-evoting-600 hover:bg-evoting-700"
-                  >
-                    Add Voter
-                  </Button>
-                </form>
-              </Form>
+              
+              {/* Move Add New Voter section here and make it horizontal */}
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <h3 className="font-medium text-lg mb-4">Add New Voter</h3>
+                
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(addVoter)} className="flex flex-wrap gap-4">
+                    <div className="flex-1 min-w-[200px]">
+                      <FormField
+                        control={form.control}
+                        name="name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Name</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Voter name" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    
+                    <div className="flex-1 min-w-[200px]">
+                      <FormField
+                        control={form.control}
+                        name="email"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Email</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Email address" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    
+                    <div className="flex-1 min-w-[200px]">
+                      <FormField
+                        control={form.control}
+                        name="company_name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Company Name</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Company name (optional)" {...field} value={field.value || ""} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    
+                    <div className="w-[120px]">
+                      <FormField
+                        control={form.control}
+                        name="voting_weight"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Weight (%)</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="number" 
+                                min="0.01"
+                                max="100"
+                                step="0.01"
+                                placeholder="1" 
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    
+                    <div className="flex items-end mb-1">
+                      <Button 
+                        type="submit" 
+                        className="bg-evoting-600 hover:bg-evoting-700"
+                      >
+                        Add Voter
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -426,7 +429,7 @@ const VoterManagement = () => {
                       <TableHead>Company</TableHead>
                       <TableHead className="text-right">Weight (%)</TableHead>
                       <TableHead className="text-right">Status</TableHead>
-                      <TableHead className="w-[80px]"></TableHead>
+                      <TableHead className="w-[80px]">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -442,8 +445,9 @@ const VoterManagement = () => {
                             variant="ghost"
                             size="icon"
                             onClick={() => deleteVoter(voter.id)}
+                            title="Remove voter"
                           >
-                            <X className="h-4 w-4" />
+                            <Trash2 className="h-4 w-4 text-red-500" />
                             <span className="sr-only">Delete</span>
                           </Button>
                         </TableCell>
