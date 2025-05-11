@@ -114,8 +114,8 @@ const ProjectDetail = () => {
       
       if (error) throw error;
       
-      // Ensure all required Project interface properties exist
-      setProject({
+      // Create a properly typed Project object with all required fields
+      const projectData: Project = {
         id: data.id,
         title: data.title,
         description: data.description,
@@ -125,7 +125,9 @@ const ProjectDetail = () => {
         start_date: data.start_date || null,
         end_date: data.end_date || null,
         admin_id: data.admin_id
-      });
+      };
+      
+      setProject(projectData);
     } catch (error: any) {
       console.error("Error fetching project:", error.message);
       toast.error("Failed to load project details");
