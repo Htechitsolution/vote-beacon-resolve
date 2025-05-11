@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calendar, Clock, Upload, Plus } from "lucide-react";
+import { Calendar, Clock, Upload, Plus, FileText, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -11,9 +11,7 @@ import Navigation from "@/components/layout/Navigation";
 import {
   Breadcrumb,
   BreadcrumbItem,
-  BreadcrumbLink,
   BreadcrumbList,
-  BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { format } from "date-fns";
@@ -45,6 +43,9 @@ import {
 } from "@/components/ui/popover";
 import { CalendarIcon } from "lucide-react";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 
 type Agenda = {
   id: string;
@@ -61,6 +62,7 @@ type Agenda = {
 type Project = {
   id: string;
   title: string;
+  status: string;
 };
 
 type Option = {
@@ -68,9 +70,11 @@ type Option = {
   title: string;
   description: string | null;
   agenda_id: string;
+  file_path?: string | null;
+  file_name?: string | null;
 };
 
-// Form schema for adding agenda
+// Form schema for adding agenda option
 const agendaFormSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().optional(),
@@ -91,14 +95,34 @@ const startVotingFormSchema = z.object({
 type AgendaFormValues = z.infer<typeof agendaFormSchema>;
 type StartVotingFormValues = z.infer<typeof startVotingFormSchema>;
 
+// Maximum file size: 5MB
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
+const ALLOWED_FILE_TYPES = [
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/zip",
+  "application/x-zip-compressed",
+];
+
 const AgendaDetail = () => {
   const { projectId, agendaId } = useParams<{ projectId: string, agendaId: string }>();
+  const navigate = useNavigate();
   const [agenda, setAgenda] = useState<Agenda | null>(null);
   const [project, setProject] = useState<Project | null>(null);
   const [options, setOptions] = useState<Option[]>([]);
   const [loading, setLoading] = useState(true);
   const [addAgendaDialogOpen, setAddAgendaDialogOpen] = useState(false);
   const [startVotingDialogOpen, setStartVotingDialogOpen] = useState(false);
+  const [uploadingFile, setUploadingFile] = useState<{ optionId: string | null, loading: boolean }>({
+    optionId: null,
+    loading: false
+  });
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const { user, profile } = useAuth();
 
   const agendaForm = useForm<AgendaFormValues>({
@@ -130,7 +154,7 @@ const AgendaDetail = () => {
       // Fetch project
       const { data: projectData, error: projectError } = await supabase
         .from('projects')
-        .select('id, title')
+        .select('id, title, status')
         .eq('id', projectId)
         .single();
 
@@ -250,6 +274,63 @@ const AgendaDetail = () => {
     }
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error("File size exceeds the limit (5MB)");
+      return;
+    }
+
+    if (!ALLOWED_FILE_TYPES.includes(file.type)) {
+      toast.error("Invalid file type. Please upload Word, Excel, PowerPoint, PDF, or ZIP files.");
+      return;
+    }
+
+    setSelectedFile(file);
+  };
+
+  const handleFileUpload = async (optionId: string) => {
+    if (!selectedFile || !optionId) return;
+
+    try {
+      setUploadingFile({ optionId, loading: true });
+
+      // Upload file to Supabase Storage
+      const fileExt = selectedFile.name.split('.').pop();
+      const fileName = `${optionId}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+      const filePath = `options/${optionId}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('voting-documents')
+        .upload(filePath, selectedFile);
+
+      if (uploadError) throw uploadError;
+
+      // Update option record with file information
+      const { error: updateError } = await supabase
+        .from('options')
+        .update({ 
+          file_path: filePath,
+          file_name: selectedFile.name 
+        })
+        .eq('id', optionId);
+
+      if (updateError) throw updateError;
+
+      toast.success("File uploaded successfully!");
+      setSelectedFile(null);
+      fetchOptions();
+
+    } catch (error: any) {
+      console.error("Error uploading file:", error.message);
+      toast.error(error.message || "Failed to upload file");
+    } finally {
+      setUploadingFile({ optionId: null, loading: false });
+    }
+  };
+
   const formatDateTime = (dateString: string | null) => {
     if (!dateString) return 'Not set';
     return format(new Date(dateString), 'MMMM d, yyyy - h:mm a');
@@ -259,8 +340,10 @@ const AgendaDetail = () => {
     agenda?.end_date && new Date(agenda.end_date) > new Date();
   
   const isVotingNotStarted = agenda?.status === 'draft';
+  const isProjectClosed = project?.status === 'closed';
   
-  const canAddOptions = isVotingNotStarted;
+  const canAddOptions = isVotingNotStarted && !isProjectClosed;
+  const canManageVoters = !isProjectClosed;
 
   if (loading) {
     return (
@@ -298,25 +381,19 @@ const AgendaDetail = () => {
         <Breadcrumb className="mb-4">
           <BreadcrumbList>
             <BreadcrumbItem>
-              <BreadcrumbLink>
-                <Link to="/">Home</Link>
-              </BreadcrumbLink>
+              <Link to="/">Home</Link>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
-              <BreadcrumbLink>
-                <Link to="/projects">Projects</Link>
-              </BreadcrumbLink>
+              <Link to="/projects">Projects</Link>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
-              <BreadcrumbLink>
-                <Link to={`/projects/${projectId}`}>{project.title}</Link>
-              </BreadcrumbLink>
+              <Link to={`/projects/${projectId}`}>{project.title}</Link>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
-              <BreadcrumbPage>{agenda.title}</BreadcrumbPage>
+              {agenda.title}
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
@@ -326,47 +403,50 @@ const AgendaDetail = () => {
             <div>
               <div className="flex items-center gap-3 mb-2">
                 <h1 className="text-3xl font-bold">{agenda.title}</h1>
-                <span className={`text-sm px-3 py-1 rounded-full font-medium ${
-                  isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                }`}>
-                  {isActive ? 'Active' : isVotingNotStarted ? 'Draft' : 'Closed'}
-                </span>
+                <Badge variant={agenda.status === 'draft' ? 'outline' : agenda.status === 'active' ? 'success' : 'secondary'}>
+                  {agenda.status === 'draft' ? 'Draft' : agenda.status === 'active' ? 'Active' : 'Closed'}
+                </Badge>
+                {profile?.role && (
+                  <Badge variant="outline" className="capitalize">
+                    {profile.role.replace('_', ' ')}
+                  </Badge>
+                )}
               </div>
               
               <p className="text-gray-600 mb-2">{agenda.description || "No description provided."}</p>
-              
-              {profile && (
-                <span className="px-2 py-1 bg-gray-100 rounded-full text-xs font-medium capitalize">
-                  {profile.role.replace('_', ' ')}
-                </span>
-              )}
             </div>
             
             <div className="flex flex-col sm:flex-row gap-2">
-              {isVotingNotStarted ? (
-                <Button
-                  className="bg-green-600 hover:bg-green-700 text-white"
-                  disabled={options.length === 0}
-                  onClick={() => setStartVotingDialogOpen(true)}
-                >
-                  Start Voting
-                </Button>
-              ) : isActive ? (
-                <Button
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
-                  onClick={handleExtendEndDate}
-                >
-                  Extend Voting Period
-                </Button>
-              ) : null}
-              
-              <Button
-                variant="outline"
-                className="flex items-center gap-2"
-              >
-                <Upload className="h-4 w-4" />
-                Upload Document
-              </Button>
+              {!isProjectClosed && (
+                <>
+                  {isVotingNotStarted ? (
+                    <div className="flex gap-2">
+                      <Button
+                        className="bg-green-600 hover:bg-green-700 text-white"
+                        disabled={options.length === 0}
+                        onClick={() => setStartVotingDialogOpen(true)}
+                      >
+                        Start Voting
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        className="flex items-center gap-2"
+                        onClick={() => navigate(`/projects/${projectId}/agenda/${agendaId}/voters`)}
+                      >
+                        <Users className="h-4 w-4" />
+                        Manage Voters
+                      </Button>
+                    </div>
+                  ) : isActive ? (
+                    <Button
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                      onClick={handleExtendEndDate}
+                    >
+                      Extend Voting Period
+                    </Button>
+                  ) : null}
+                </>
+              )}
             </div>
           </div>
           
@@ -435,15 +515,79 @@ const AgendaDetail = () => {
                 )}
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {options.map((option) => (
-                  <Card key={option.id}>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-lg">{option.title}</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-gray-600">{option.description || "No description"}</p>
-                    </CardContent>
+              <div className="space-y-6">
+                {options.map((option, index) => (
+                  <Card key={option.id} className={`${!isVotingNotStarted && "bg-red-50"} overflow-hidden`}>
+                    <div className="p-6">
+                      <div className="mb-4">
+                        <h3 className="text-lg font-semibold">Option {index + 1}: {option.title}</h3>
+                        <p className="text-gray-600 mt-2">{option.description || "No description"}</p>
+                      </div>
+                      
+                      {!isVotingNotStarted ? (
+                        <div className="mt-6">
+                          <RadioGroup defaultValue="approve" className="space-y-4">
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="approve" id={`approve-${option.id}`} />
+                              <Label htmlFor={`approve-${option.id}`}>Approve</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="reject" id={`reject-${option.id}`} />
+                              <Label htmlFor={`reject-${option.id}`}>Reject</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="abstain" id={`abstain-${option.id}`} />
+                              <Label htmlFor={`abstain-${option.id}`}>Abstain</Label>
+                            </div>
+                          </RadioGroup>
+                        </div>
+                      ) : (
+                        <>
+                          {option.file_name ? (
+                            <div className="mt-4 flex items-center">
+                              <FileText className="h-4 w-4 mr-2 text-gray-500" />
+                              <span className="text-sm">{option.file_name}</span>
+                            </div>
+                          ) : (
+                            <div className="mt-4">
+                              <input
+                                type="file"
+                                id={`file-${option.id}`}
+                                onChange={handleFileChange}
+                                className="hidden"
+                                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip"
+                              />
+                              <div className="flex items-center gap-2">
+                                <label
+                                  htmlFor={`file-${option.id}`}
+                                  className="cursor-pointer flex items-center gap-2 text-sm text-gray-700 hover:text-evoting-600"
+                                >
+                                  <Upload className="h-4 w-4" />
+                                  Attach Document (Word, Excel, PPT, PDF, ZIP - Max 5MB)
+                                </label>
+                                {selectedFile && (
+                                  <Button
+                                    size="sm"
+                                    disabled={uploadingFile.loading}
+                                    onClick={() => handleFileUpload(option.id)}
+                                    className="ml-2"
+                                  >
+                                    {uploadingFile.loading && uploadingFile.optionId === option.id
+                                      ? "Uploading..."
+                                      : "Upload"}
+                                  </Button>
+                                )}
+                              </div>
+                              {selectedFile && (
+                                <div className="mt-2 text-sm text-gray-600">
+                                  Selected file: {selectedFile.name}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </Card>
                 ))}
               </div>
@@ -452,7 +596,7 @@ const AgendaDetail = () => {
           
           <div>
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">Voters</h2>
+              <h2 className="text-xl font-bold">Voters & Results</h2>
               <Button
                 variant="outline"
                 className="text-sm"
@@ -468,7 +612,7 @@ const AgendaDetail = () => {
               <CardContent className="py-4">
                 <div className="flex justify-between items-center">
                   <div>
-                    <p className="text-gray-600">Manage voters and view voting results</p>
+                    <p className="text-gray-600">View voting results and voter participation</p>
                   </div>
                   <Button asChild>
                     <Link to={`/projects/${projectId}/agenda/${agendaId}/results`}>
@@ -487,7 +631,7 @@ const AgendaDetail = () => {
             <DialogHeader>
               <DialogTitle>Add Voting Option</DialogTitle>
               <DialogDescription>
-                Add a new option for voters to select.
+                Add a new resolution or option for voters to vote on.
               </DialogDescription>
             </DialogHeader>
             
@@ -498,9 +642,9 @@ const AgendaDetail = () => {
                   name="title"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Option Title</FormLabel>
+                      <FormLabel>Resolution Title</FormLabel>
                       <FormControl>
-                        <Input placeholder="Enter option title..." {...field} />
+                        <Input placeholder="Enter resolution title..." {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -512,13 +656,13 @@ const AgendaDetail = () => {
                   name="description"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Description (Optional)</FormLabel>
+                      <FormLabel>Detailed Resolution</FormLabel>
                       <FormControl>
                         <Textarea 
-                          placeholder="Enter option description..." 
+                          placeholder="Enter detailed resolution text..." 
                           {...field} 
                           value={field.value || ""}
-                          rows={3}
+                          rows={5}
                         />
                       </FormControl>
                       <FormMessage />
@@ -531,7 +675,7 @@ const AgendaDetail = () => {
                     Cancel
                   </Button>
                   <Button type="submit" className="bg-evoting-600 hover:bg-evoting-700 text-white">
-                    Add Option
+                    Add Resolution
                   </Button>
                 </DialogFooter>
               </form>
@@ -579,7 +723,7 @@ const AgendaDetail = () => {
                             selected={field.value}
                             onSelect={field.onChange}
                             disabled={(date) => date < new Date()}
-                            className="pointer-events-auto" // Add this to fix the date picker
+                            initialFocus
                           />
                         </PopoverContent>
                       </Popover>

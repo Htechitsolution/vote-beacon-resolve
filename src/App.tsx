@@ -15,6 +15,7 @@ import SuperAdmin from "./pages/SuperAdmin";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import NotFound from "./pages/NotFound";
+import VoterManagement from "./pages/VoterManagement";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import SuperAdminRoute from "./components/SuperAdminRoute";
@@ -57,6 +58,22 @@ const AppRoutes = () => (
       element={
         <ProtectedRoute>
           <AgendaDetail />
+        </ProtectedRoute>
+      } 
+    />
+    <Route 
+      path="/projects/:projectId/agenda/:agendaId/voters" 
+      element={
+        <ProtectedRoute>
+          <VoterManagement />
+        </ProtectedRoute>
+      } 
+    />
+    <Route 
+      path="/projects/:projectId/voters" 
+      element={
+        <ProtectedRoute>
+          <VoterManagement />
         </ProtectedRoute>
       } 
     />
