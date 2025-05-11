@@ -212,6 +212,7 @@ export type Database = {
           created_at: string
           id: string
           option_id: string
+          value: string | null
           voter_id: string
           voting_weight: number | null
         }
@@ -220,6 +221,7 @@ export type Database = {
           created_at?: string
           id?: string
           option_id: string
+          value?: string | null
           voter_id: string
           voting_weight?: number | null
         }
@@ -228,6 +230,7 @@ export type Database = {
           created_at?: string
           id?: string
           option_id?: string
+          value?: string | null
           voter_id?: string
           voting_weight?: number | null
         }
