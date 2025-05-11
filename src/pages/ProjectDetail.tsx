@@ -1,13 +1,20 @@
 
 import React, { useState, useEffect } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Search, Calendar, Clock } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  ChevronRight,
+  Plus,
+  CalendarIcon,
+  UsersIcon,
+  ClipboardListIcon,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { format, parseISO } from "date-fns";
 import Navigation from "@/components/layout/Navigation";
 import {
   Dialog,
@@ -16,6 +23,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Form,
@@ -25,6 +33,16 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { useForm } from "react-hook-form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -33,360 +51,193 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import * as z from "zod";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { format } from "date-fns";
-import { CalendarIcon } from "lucide-react";
-import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 
-type Project = {
+interface Project {
   id: string;
   title: string;
-  description: string | null;
+  description: string;
   status: string;
   created_at: string;
-  admin_id: string;
-};
-
-type Agenda = {
-  id: string;
-  title: string;
-  description: string | null;
-  project_id: string;
+  updated_at: string;
   start_date: string | null;
   end_date: string | null;
+}
+
+interface Agenda {
+  id: string;
+  title: string;
+  description: string;
   status: string;
-  voting_type: string;
+  project_id: string;
   created_at: string;
-};
-
-// Form schema for creating a new agenda/meeting
-const agendaFormSchema = z.object({
-  title: z.string().min(1, "Title is required"),
-  description: z.string().optional(),
-});
-
-// Form schema for updating project status
-const projectStatusFormSchema = z.object({
-  status: z.string().min(1, "Status is required"),
-});
-
-type AgendaFormValues = z.infer<typeof agendaFormSchema>;
-type ProjectStatusValues = z.infer<typeof projectStatusFormSchema>;
-
-const VotingSummary = ({ projectId }: { projectId: string }) => {
-  const [votingStats, setVotingStats] = useState({
-    total: 0,
-    active: 0,
-    completed: 0
-  });
-
-  useEffect(() => {
-    const fetchVotingStats = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('agendas')
-          .select('*') // Make sure we select all fields including end_date
-          .eq('project_id', projectId);
-        
-        if (error) throw error;
-
-        const currentDate = new Date();
-        
-        const stats = {
-          total: data?.length || 0,
-          active: data?.filter(a => {
-            if (a.status === 'active' && a.end_date) {
-              return new Date(a.end_date) > currentDate;
-            }
-            return false;
-          }).length || 0,
-          completed: data?.filter(a => {
-            if (a.status === 'completed' || (a.end_date && new Date(a.end_date) < currentDate)) {
-              return true;
-            }
-            return false;
-          }).length || 0
-        };
-        
-        setVotingStats(stats);
-      } catch (error: any) {
-        console.error("Error fetching voting stats:", error.message);
-      }
-    };
-
-    fetchVotingStats();
-  }, [projectId]);
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground">Total Votings</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-3xl font-bold">{votingStats.total}</p>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground">Live Votings</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-3xl font-bold text-green-600">{votingStats.active}</p>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground">Completed Votings</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-3xl font-bold text-blue-600">{votingStats.completed}</p>
-        </CardContent>
-      </Card>
-    </div>
-  );
-};
-
-const AgendaCard = ({ agenda }: { agenda: Agenda }) => {
-  const isActive = agenda.status === 'live';
-  const isClosed = agenda.status === 'closed';
-
-  const formatDateTime = (dateString: string | null) => {
-    if (!dateString) return 'Not set';
-    return format(new Date(dateString), 'MMM d, yyyy - h:mm a');
-  };
-
-  return (
-    <Card className={`hover:shadow-md transition-shadow ${
-      isActive ? 'border-green-400 border-2' : 
-      isClosed ? 'bg-gray-50' : ''
-    }`}>
-      <CardHeader>
-        <div className="flex justify-between items-start">
-          <CardTitle className={`text-xl ${
-            isActive ? 'text-green-700' : 
-            isClosed ? 'text-gray-700' : ''
-          }`}>
-            {agenda.title}
-          </CardTitle>
-          <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-            isActive ? 'bg-green-100 text-green-800' : 
-            isClosed ? 'bg-gray-100 text-gray-800' : 
-            'bg-yellow-100 text-yellow-800'
-          }`}>
-            {isActive ? 'Live' : isClosed ? 'Closed' : 'Draft'}
-          </span>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <p className={`mb-3 ${!isActive ? 'text-gray-500' : 'text-gray-700'}`}>
-          {agenda.description || "No description"}
-        </p>
-        
-        <div className="space-y-2">
-          {(agenda.start_date || agenda.end_date) && (
-            <>
-              {agenda.start_date && (
-                <div className="flex items-center text-sm">
-                  <Calendar className="h-4 w-4 mr-2 text-gray-500" />
-                  <span className="text-gray-700 font-medium">Start:</span>
-                  <span className="ml-2 text-gray-600">{formatDateTime(agenda.start_date)}</span>
-                </div>
-              )}
-              
-              {agenda.end_date && (
-                <div className="flex items-center text-sm">
-                  <Clock className="h-4 w-4 mr-2 text-gray-500" />
-                  <span className="text-gray-700 font-medium">End:</span>
-                  <span className="ml-2 text-gray-600">{formatDateTime(agenda.end_date)}</span>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      </CardContent>
-      <div className="px-6 py-4 border-t">
-        <Button asChild variant="outline" className="w-full">
-          <Link to={`/projects/${agenda.project_id}/agenda/${agenda.id}`}>
-            View Voting Details
-          </Link>
-        </Button>
-      </div>
-    </Card>
-  );
-};
+  updated_at: string;
+}
 
 const ProjectDetail = () => {
   const { projectId } = useParams<{ projectId: string }>();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  
   const [project, setProject] = useState<Project | null>(null);
   const [agendas, setAgendas] = useState<Agenda[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [statusDialogOpen, setStatusDialogOpen] = useState(false);
-  const { user, profile } = useAuth();
-  const navigate = useNavigate();
+  const [isLoadingProject, setIsLoadingProject] = useState(true);
+  const [isLoadingAgendas, setIsLoadingAgendas] = useState(true);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [voterCount, setVoterCount] = useState(0);
   
-  const form = useForm<AgendaFormValues>({
-    resolver: zodResolver(agendaFormSchema),
+  const form = useForm({
     defaultValues: {
       title: "",
       description: "",
+      status: "draft",
     },
   });
   
-  const statusForm = useForm<ProjectStatusValues>({
-    resolver: zodResolver(projectStatusFormSchema),
-    defaultValues: {
-      status: "",
-    },
-  });
-
   useEffect(() => {
     if (projectId) {
       fetchProject();
       fetchAgendas();
+      fetchVoterCount();
     }
   }, [projectId]);
   
-  useEffect(() => {
-    if (project) {
-      statusForm.setValue("status", project.status);
-    }
-  }, [project, statusForm]);
-
   const fetchProject = async () => {
     try {
-      if (!projectId) return;
-      
+      setIsLoadingProject(true);
       const { data, error } = await supabase
-        .from('projects')
-        .select('*')
-        .eq('id', projectId)
+        .from("projects")
+        .select("*")
+        .eq("id", projectId)
         .single();
-
-      if (error) {
-        throw error;
-      }
-
+      
+      if (error) throw error;
+      
       setProject(data);
     } catch (error: any) {
-      console.error("Error fetching project details:", error.message);
+      console.error("Error fetching project:", error.message);
       toast.error("Failed to load project details");
-      navigate('/projects');
+    } finally {
+      setIsLoadingProject(false);
     }
   };
-
+  
   const fetchAgendas = async () => {
     try {
-      setLoading(true);
-      if (!projectId) return;
-
+      setIsLoadingAgendas(true);
       const { data, error } = await supabase
-        .from('agendas')
-        .select('*')
-        .eq('project_id', projectId)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        throw error;
-      }
-
+        .from("agendas")
+        .select("*")
+        .eq("project_id", projectId)
+        .order("created_at", { ascending: false });
+      
+      if (error) throw error;
+      
       setAgendas(data || []);
     } catch (error: any) {
       console.error("Error fetching agendas:", error.message);
-      toast.error("Failed to load voting agendas");
+      toast.error("Failed to load agendas");
     } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleCreateAgenda = async (values: AgendaFormValues) => {
-    try {
-      if (!user || !projectId) {
-        toast.error("You must be logged in to create a voting agenda");
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from('agendas')
-        .insert([
-          { 
-            title: values.title,
-            description: values.description || null,
-            project_id: projectId,
-            status: 'draft', // Ensure default status is 'draft' 
-            voting_type: 'single_choice'
-          }
-        ])
-        .select();
-
-      if (error) {
-        throw error;
-      }
-
-      toast.success("Voting created successfully!");
-      setCreateDialogOpen(false);
-      form.reset();
-      fetchAgendas();
-    } catch (error: any) {
-      console.error("Error creating agenda:", error.message);
-      toast.error(error.message || "Failed to create voting");
+      setIsLoadingAgendas(false);
     }
   };
   
-  const handleUpdateStatus = async (values: ProjectStatusValues) => {
+  const fetchVoterCount = async () => {
     try {
-      if (!projectId) return;
+      const { count, error } = await supabase
+        .from("voters")
+        .select("*", { count: "exact", head: true })
+        .eq("project_id", projectId);
       
-      const { error } = await supabase
-        .from('projects')
-        .update({ status: values.status })
-        .eq('id', projectId);
-        
       if (error) throw error;
       
-      toast.success(`Project status updated to ${values.status}`);
-      fetchProject();
-      setStatusDialogOpen(false);
+      setVoterCount(count || 0);
     } catch (error: any) {
-      console.error("Error updating project status:", error.message);
-      toast.error(error.message || "Failed to update project status");
+      console.error("Error fetching voter count:", error.message);
     }
   };
   
-  const filteredAgendas = agendas.filter(agenda => 
-    agenda.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (agenda.description && agenda.description.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
-
-  if (!project && !loading) {
+  const handleCreateAgenda = async (values: any) => {
+    try {
+      const { data, error } = await supabase
+        .from("agendas")
+        .insert({
+          title: values.title,
+          description: values.description,
+          status: values.status,
+          project_id: projectId,
+        })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      
+      toast.success("Agenda created successfully");
+      setIsDialogOpen(false);
+      form.reset();
+      
+      // Add the new agenda to the list
+      setAgendas([data, ...agendas]);
+      
+    } catch (error: any) {
+      console.error("Error creating agenda:", error.message);
+      toast.error("Failed to create agenda");
+    }
+  };
+  
+  const getStatusBadge = (status: string) => {
+    const statusStyles = {
+      draft: "bg-gray-100 text-gray-800",
+      live: "bg-green-100 text-green-800",
+      closed: "bg-red-100 text-red-800"
+    };
+    
     return (
-      <div className="container mx-auto px-4 py-8 text-center">
-        <h1 className="text-2xl font-bold text-red-600">Project Not Found</h1>
-        <p className="mt-2">The project you're looking for doesn't exist or you don't have permission to view it.</p>
-        <Button className="mt-4" asChild>
-          <Link to="/projects">Back to Projects</Link>
-        </Button>
+      <Badge className={statusStyles[status as keyof typeof statusStyles]}>
+        {status.charAt(0).toUpperCase() + status.slice(1)}
+      </Badge>
+    );
+  };
+  
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return "Not set";
+    
+    try {
+      return format(parseISO(dateString), "MMM d, yyyy");
+    } catch (error) {
+      return "Invalid date";
+    }
+  };
+  
+  if (isLoadingProject) {
+    return (
+      <div>
+        <Navigation />
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex justify-center items-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-evoting-600"></div>
+          </div>
+        </div>
       </div>
     );
   }
-
+  
+  if (!project) {
+    return (
+      <div>
+        <Navigation />
+        <div className="container mx-auto px-4 py-8">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-red-600">Project Not Found</h1>
+            <p className="mt-2">The requested project could not be found.</p>
+            <Button className="mt-4" asChild>
+              <Link to="/projects">Back to Projects</Link>
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
   return (
     <div>
       <Navigation />
@@ -395,114 +246,46 @@ const ProjectDetail = () => {
         <Breadcrumb className="mb-4">
           <BreadcrumbList>
             <BreadcrumbItem>
-              <BreadcrumbLink>
+              <BreadcrumbLink asChild>
                 <Link to="/">Home</Link>
               </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
-              <BreadcrumbLink>
+              <BreadcrumbLink asChild>
                 <Link to="/projects">Projects</Link>
               </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
-              <BreadcrumbPage>{project?.title || "Project Details"}</BreadcrumbPage>
+              <BreadcrumbPage>{project.title}</BreadcrumbPage>
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
-
-        {loading && !project ? (
-          <div className="flex justify-center py-20">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-evoting-600"></div>
+        
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold">{project.title}</h1>
+              {getStatusBadge(project.status)}
+            </div>
+            <p className="text-gray-600 mt-1">{project.description}</p>
           </div>
-        ) : (
-          <>
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
-              <div>
-                <div className="flex items-center gap-3">
-                  <h1 className="text-3xl font-bold">{project?.title}</h1>
-                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                    project?.status === 'active' ? 'bg-green-100 text-green-800' :
-                    project?.status === 'completed' ? 'bg-blue-100 text-blue-800' :
-                    'bg-yellow-100 text-yellow-800'
-                  }`}>
-                    {project?.status.charAt(0).toUpperCase() + project?.status.slice(1)}
-                  </span>
-                </div>
-                <p className="text-gray-600 mt-1">{project?.description || "No description provided."}</p>
-                
-                <div className="flex items-center gap-3 mt-2">
-                  <p className="text-sm text-gray-500">
-                    Created on {new Date(project?.created_at || "").toLocaleDateString()}
-                  </p>
-                  
-                  {profile && (
-                    <span className="px-2 py-1 bg-gray-100 rounded-full text-xs font-medium capitalize">
-                      {profile.role.replace('_', ' ')}
-                    </span>
-                  )}
-                </div>
-              </div>
-              
-              <div className="flex flex-col sm:flex-row gap-2">
-                <Button 
-                  variant="outline" 
-                  onClick={() => setStatusDialogOpen(true)}
-                >
-                  Update Status
+          
+          <div className="flex flex-col sm:flex-row gap-3">
+            {/* Always show the Add Agenda button, regardless of project status */}
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-evoting-600 hover:bg-evoting-700 text-white">
+                  <Plus size={16} className="mr-1" />
+                  Add Agenda
                 </Button>
-                
-                <Button 
-                  className="bg-evoting-600 hover:bg-evoting-700 text-white"
-                  onClick={() => setCreateDialogOpen(true)}
-                >
-                  <Plus className="mr-2 h-4 w-4" /> New Voting
-                </Button>
-              </div>
-            </div>
-            
-            <VotingSummary projectId={projectId || ""} />
-            
-            <div className="mb-8 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-              <Input 
-                className="pl-10"
-                placeholder="Search votings..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-            
-            {loading ? (
-              <div className="flex justify-center py-10">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-evoting-600"></div>
-              </div>
-            ) : filteredAgendas.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {filteredAgendas.map((agenda) => (
-                  <AgendaCard key={agenda.id} agenda={agenda} />
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-10">
-                <p className="text-gray-500 mb-4">No votings found for this project.</p>
-                <Button 
-                  className="bg-evoting-600 hover:bg-evoting-700 text-white"
-                  onClick={() => setCreateDialogOpen(true)}
-                >
-                  <Plus className="mr-2 h-4 w-4" /> Create your first voting
-                </Button>
-              </div>
-            )}
-
-            {/* Create Agenda Dialog */}
-            <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-              <DialogContent className="sm:max-w-[500px]">
+              </DialogTrigger>
+              <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Create New Voting</DialogTitle>
+                  <DialogTitle>Create New Agenda</DialogTitle>
                   <DialogDescription>
-                    Set up a new voting session for this project.
+                    Add an agenda item for this project
                   </DialogDescription>
                 </DialogHeader>
                 
@@ -513,9 +296,9 @@ const ProjectDetail = () => {
                       name="title"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Voting Title</FormLabel>
+                          <FormLabel>Title</FormLabel>
                           <FormControl>
-                            <Input placeholder="Enter voting title..." {...field} />
+                            <Input placeholder="Enter agenda title" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -527,12 +310,12 @@ const ProjectDetail = () => {
                       name="description"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Description (Optional)</FormLabel>
+                          <FormLabel>Description</FormLabel>
                           <FormControl>
                             <Textarea 
-                              placeholder="Enter voting description..." 
+                              placeholder="Enter agenda description" 
                               {...field} 
-                              rows={3}
+                              rows={4}
                             />
                           </FormControl>
                           <FormMessage />
@@ -540,51 +323,25 @@ const ProjectDetail = () => {
                       )}
                     />
                     
-                    <DialogFooter>
-                      <Button type="button" variant="outline" onClick={() => setCreateDialogOpen(false)}>
-                        Cancel
-                      </Button>
-                      <Button type="submit" className="bg-evoting-600 hover:bg-evoting-700 text-white">
-                        Create Voting
-                      </Button>
-                    </DialogFooter>
-                  </form>
-                </Form>
-              </DialogContent>
-            </Dialog>
-            
-            {/* Update Project Status Dialog */}
-            <Dialog open={statusDialogOpen} onOpenChange={setStatusDialogOpen}>
-              <DialogContent className="sm:max-w-[400px]">
-                <DialogHeader>
-                  <DialogTitle>Update Project Status</DialogTitle>
-                  <DialogDescription>
-                    Change the current status of this project.
-                  </DialogDescription>
-                </DialogHeader>
-                
-                <Form {...statusForm}>
-                  <form onSubmit={statusForm.handleSubmit(handleUpdateStatus)} className="space-y-4">
                     <FormField
-                      control={statusForm.control}
+                      control={form.control}
                       name="status"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Project Status</FormLabel>
-                          <Select
-                            onValueChange={field.onChange}
+                          <FormLabel>Status</FormLabel>
+                          <Select 
+                            onValueChange={field.onChange} 
                             defaultValue={field.value}
-                            value={field.value}
                           >
                             <FormControl>
                               <SelectTrigger>
-                                <SelectValue placeholder="Select project status" />
+                                <SelectValue placeholder="Select status" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
                               <SelectItem value="draft">Draft</SelectItem>
-                              <SelectItem value="active">Active</SelectItem>
-                              <SelectItem value="completed">Completed</SelectItem>
+                              <SelectItem value="live">Live</SelectItem>
+                              <SelectItem value="closed">Closed</SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -593,18 +350,106 @@ const ProjectDetail = () => {
                     />
                     
                     <DialogFooter>
-                      <Button type="button" variant="outline" onClick={() => setStatusDialogOpen(false)}>
+                      <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
                         Cancel
                       </Button>
                       <Button type="submit" className="bg-evoting-600 hover:bg-evoting-700 text-white">
-                        Update Status
+                        Create Agenda
                       </Button>
                     </DialogFooter>
                   </form>
                 </Form>
               </DialogContent>
             </Dialog>
-          </>
+            
+            {project.status !== "closed" && (
+              <Button 
+                variant="outline"
+                onClick={() => navigate(`/projects/${projectId}/voters`)}
+              >
+                <UsersIcon size={16} className="mr-1" />
+                Manage Voters ({voterCount})
+              </Button>
+            )}
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2 mb-2">
+                <CalendarIcon size={16} className="text-evoting-600" />
+                <h3 className="font-medium">Start Date</h3>
+              </div>
+              <p>{formatDate(project.start_date)}</p>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2 mb-2">
+                <CalendarIcon size={16} className="text-evoting-600" />
+                <h3 className="font-medium">End Date</h3>
+              </div>
+              <p>{formatDate(project.end_date)}</p>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2 mb-2">
+                <ClipboardListIcon size={16} className="text-evoting-600" />
+                <h3 className="font-medium">Agendas</h3>
+              </div>
+              <p>{agendas.length} agenda items</p>
+            </CardContent>
+          </Card>
+        </div>
+        
+        <h2 className="text-2xl font-bold mb-4">Agendas</h2>
+        
+        {isLoadingAgendas ? (
+          <div className="flex justify-center py-10">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-evoting-600"></div>
+          </div>
+        ) : agendas.length > 0 ? (
+          <div className="space-y-4">
+            {agendas.map((agenda) => (
+              <Card key={agenda.id} className="overflow-hidden hover:shadow-md transition-shadow">
+                <CardContent className="p-0">
+                  <Link 
+                    to={`/projects/${projectId}/agenda/${agenda.id}`}
+                    className="block p-6"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="font-semibold text-lg">{agenda.title}</h3>
+                          {getStatusBadge(agenda.status)}
+                        </div>
+                        <p className="text-gray-600 line-clamp-2">{agenda.description}</p>
+                        <p className="text-xs text-gray-500 mt-2">
+                          Created: {formatDate(agenda.created_at)}
+                        </p>
+                      </div>
+                      <ChevronRight size={20} className="text-gray-400" />
+                    </div>
+                  </Link>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-10 border rounded-lg">
+            <p className="text-gray-500">No agendas found for this project.</p>
+            <Button 
+              className="mt-4 bg-evoting-600 hover:bg-evoting-700 text-white"
+              onClick={() => setIsDialogOpen(true)}
+            >
+              <Plus size={16} className="mr-1" />
+              Create First Agenda
+            </Button>
+          </div>
         )}
       </div>
     </div>

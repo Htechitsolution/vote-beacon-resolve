@@ -28,6 +28,7 @@ const ContactUs = () => {
     setIsSubmitting(true);
     
     try {
+      // Use the updated function that works properly
       const { error } = await supabase.functions.invoke('send-contact-email', {
         body: {
           name,
