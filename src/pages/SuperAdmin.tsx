@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
@@ -11,78 +11,92 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { format } from "date-fns";
+import { toast } from "sonner";
 
-// This would be fetched from Supabase once integrated
-const dummyUsers = [
-  {
-    id: "1",
-    name: "John Smith",
-    email: "john@example.com",
-    companyName: "Smith Consultants",
-    role: "admin",
-    createdAt: "2025-04-01",
-    status: "active"
-  },
-  {
-    id: "2",
-    name: "Sarah Johnson",
-    email: "sarah@example.com",
-    companyName: "Johnson & Associates",
-    role: "admin",
-    createdAt: "2025-04-05",
-    status: "active"
-  },
-  {
-    id: "3",
-    name: "Michael Brown",
-    email: "michael@example.com",
-    companyName: "Brown Resolution Services",
-    role: "admin",
-    createdAt: "2025-04-10",
-    status: "inactive"
-  },
-  {
-    id: "4",
-    name: "Lisa Davis",
-    email: "lisa@example.com",
-    companyName: "Davis Consulting",
-    role: "admin",
-    createdAt: "2025-04-15",
-    status: "active"
-  },
-  {
-    id: "5",
-    name: "Robert Wilson",
-    email: "robert@example.com",
-    companyName: "Wilson & Partners",
-    role: "admin",
-    createdAt: "2025-04-20",
-    status: "pending"
-  }
-];
+type Profile = {
+  id: string;
+  name: string;
+  email: string;
+  company_name: string | null;
+  role: "super_admin" | "admin" | "voter";
+  created_at: string;
+  updated_at: string;
+};
 
 const SuperAdmin = () => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [users, setUsers] = useState<Profile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { isSuper } = useAuth();
   
-  const filteredUsers = dummyUsers.filter(user => 
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*');
+
+      if (error) {
+        throw error;
+      }
+
+      setUsers(data || []);
+    } catch (error: any) {
+      console.error("Error fetching users:", error.message);
+      toast.error("Failed to load users");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredUsers = users.filter(user => 
     user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    user.companyName.toLowerCase().includes(searchQuery.toLowerCase())
+    (user.company_name && user.company_name.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (role: string) => {
     const statusStyles = {
-      active: "bg-green-100 text-green-800",
-      inactive: "bg-red-100 text-red-800",
-      pending: "bg-yellow-100 text-yellow-800"
+      super_admin: "bg-purple-100 text-purple-800",
+      admin: "bg-green-100 text-green-800",
+      voter: "bg-blue-100 text-blue-800"
     };
     
     return (
-      <span className={`text-xs px-2 py-1 rounded-full font-medium ${statusStyles[status as keyof typeof statusStyles] || "bg-gray-100"}`}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
+      <span className={`text-xs px-2 py-1 rounded-full font-medium ${statusStyles[role as keyof typeof statusStyles] || "bg-gray-100"}`}>
+        {role === 'super_admin' ? 'Super Admin' : role.charAt(0).toUpperCase() + role.slice(1)}
       </span>
     );
   };
+
+  const formatDate = (dateString: string) => {
+    try {
+      return format(new Date(dateString), 'yyyy-MM-dd');
+    } catch (error) {
+      return dateString.split('T')[0] || 'Unknown';
+    }
+  };
+
+  if (!isSuper) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-red-600">Access Denied</h1>
+          <p className="mt-2">You don't have permission to access this page.</p>
+          <Button className="mt-4 bg-evoting-600 hover:bg-evoting-700 text-white" asChild>
+            <a href="/projects">Back to Projects</a>
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
@@ -107,36 +121,42 @@ const SuperAdmin = () => {
         />
       </div>
       
-      <div className="border rounded-lg overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead className="hidden md:table-cell">Company</TableHead>
-              <TableHead className="hidden md:table-cell">Joined</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredUsers.map((user) => (
-              <TableRow key={user.id}>
-                <TableCell className="font-medium">{user.name}</TableCell>
-                <TableCell>{user.email}</TableCell>
-                <TableCell className="hidden md:table-cell">{user.companyName}</TableCell>
-                <TableCell className="hidden md:table-cell">{user.createdAt}</TableCell>
-                <TableCell>{getStatusBadge(user.status)}</TableCell>
-                <TableCell className="text-right">
-                  <Button variant="outline" size="sm">View</Button>
-                </TableCell>
+      {loading ? (
+        <div className="flex justify-center py-10">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-evoting-600"></div>
+        </div>
+      ) : (
+        <div className="border rounded-lg overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead className="hidden md:table-cell">Company</TableHead>
+                <TableHead className="hidden md:table-cell">Joined</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+            </TableHeader>
+            <TableBody>
+              {filteredUsers.map((user) => (
+                <TableRow key={user.id}>
+                  <TableCell className="font-medium">{user.name}</TableCell>
+                  <TableCell>{user.email}</TableCell>
+                  <TableCell className="hidden md:table-cell">{user.company_name || '-'}</TableCell>
+                  <TableCell className="hidden md:table-cell">{formatDate(user.created_at)}</TableCell>
+                  <TableCell>{getStatusBadge(user.role)}</TableCell>
+                  <TableCell className="text-right">
+                    <Button variant="outline" size="sm">View</Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
       
-      {filteredUsers.length === 0 && (
+      {!loading && filteredUsers.length === 0 && (
         <div className="text-center py-10">
           <p className="text-gray-500">No users found matching your search.</p>
         </div>

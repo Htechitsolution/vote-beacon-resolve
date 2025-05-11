@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,13 +8,21 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toast } from "sonner";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Login = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("admin");
-  const [isLoading, setIsLoading] = useState(false);
+  const { signIn, isLoading, user } = useAuth();
+
+  useEffect(() => {
+    // Redirect to projects if already logged in
+    if (user) {
+      navigate('/projects');
+    }
+  }, [user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,23 +32,7 @@ const Login = () => {
       return;
     }
 
-    setIsLoading(true);
-    
-    try {
-      // This is where Supabase authentication would be implemented
-      console.log("Logging in as:", { email, role });
-      toast.success(`Successfully logged in as ${role}`);
-      
-      // Redirect to project page after login
-      setTimeout(() => {
-        navigate("/projects");
-      }, 1000);
-    } catch (error) {
-      console.error("Login error:", error);
-      toast.error("Failed to log in. Please check your credentials.");
-    } finally {
-      setIsLoading(false);
-    }
+    await signIn(email, password, role);
   };
 
   return (

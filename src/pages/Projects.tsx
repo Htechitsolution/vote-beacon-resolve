@@ -1,50 +1,23 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Search } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
-// This would be fetched from Supabase once integrated
-const dummyProjects = [
-  {
-    id: "1",
-    title: "ABC Ltd. Resolution Voting",
-    description: "CoC voting for resolution plans under IBC",
-    createdAt: "2025-05-01",
-    status: "active"
-  },
-  {
-    id: "2",
-    title: "XYZ Industries Liquidation Voting",
-    description: "CoC voting for liquidation process",
-    createdAt: "2025-04-28",
-    status: "completed"
-  },
-  {
-    id: "3",
-    title: "Local Sports Club Annual Election",
-    description: "Committee member election for 2025-2026",
-    createdAt: "2025-04-15",
-    status: "upcoming"
-  },
-  {
-    id: "4",
-    title: "College Student Union Poll",
-    description: "Student poll for new campus facilities",
-    createdAt: "2025-04-10",
-    status: "draft"
-  }
-];
-
-// Mock function to check if user is super admin
-const isSuperAdmin = () => {
-  // This would use actual auth context/Supabase once integrated
-  return true;
+type Project = {
+  id: string;
+  title: string;
+  description: string | null;
+  status: string;
+  created_at: string;
 };
 
-const ProjectCard = ({ project }: { project: typeof dummyProjects[0] }) => {
+const ProjectCard = ({ project }: { project: Project }) => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "active":
@@ -69,8 +42,8 @@ const ProjectCard = ({ project }: { project: typeof dummyProjects[0] }) => {
         </div>
       </CardHeader>
       <CardContent>
-        <p className="text-gray-600 mb-2">{project.description}</p>
-        <p className="text-sm text-gray-500">Created: {project.createdAt}</p>
+        <p className="text-gray-600 mb-2">{project.description || "No description"}</p>
+        <p className="text-sm text-gray-500">Created: {new Date(project.created_at).toLocaleDateString()}</p>
       </CardContent>
       <CardFooter className="border-t pt-4">
         <Button asChild variant="outline" className="w-full">
@@ -85,11 +58,37 @@ const ProjectCard = ({ project }: { project: typeof dummyProjects[0] }) => {
 
 const Projects = () => {
   const [searchQuery, setSearchQuery] = useState("");
-  const superAdmin = isSuperAdmin();
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { isSuper } = useAuth();
   
-  const filteredProjects = dummyProjects.filter(project => 
+  useEffect(() => {
+    fetchProjects();
+  }, []);
+
+  const fetchProjects = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*');
+
+      if (error) {
+        throw error;
+      }
+
+      setProjects(data || []);
+    } catch (error: any) {
+      console.error("Error fetching projects:", error.message);
+      toast.error("Failed to load projects");
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const filteredProjects = projects.filter(project => 
     project.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    project.description.toLowerCase().includes(searchQuery.toLowerCase())
+    (project.description && project.description.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   return (
@@ -98,7 +97,7 @@ const Projects = () => {
         <h1 className="text-3xl font-bold">Your Projects</h1>
         
         <div className="flex items-center gap-4">
-          {superAdmin && (
+          {isSuper && (
             <Button variant="outline" asChild>
               <Link to="/admin/dashboard">Super Admin</Link>
             </Button>
@@ -119,7 +118,11 @@ const Projects = () => {
         />
       </div>
       
-      {filteredProjects.length > 0 ? (
+      {loading ? (
+        <div className="flex justify-center py-20">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-evoting-600"></div>
+        </div>
+      ) : filteredProjects.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredProjects.map((project) => (
             <ProjectCard key={project.id} project={project} />

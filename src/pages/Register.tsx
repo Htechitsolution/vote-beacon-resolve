@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,9 +8,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Register = () => {
   const navigate = useNavigate();
+  const { signUp, isLoading, user } = useAuth();
   const [formData, setFormData] = useState({
     name: "",
     companyName: "",
@@ -19,7 +21,13 @@ const Register = () => {
     confirmPassword: "",
     agreeTerms: false
   });
-  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    // Redirect to projects if already logged in
+    if (user) {
+      navigate('/projects');
+    }
+  }, [user, navigate]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
@@ -48,28 +56,7 @@ const Register = () => {
       return;
     }
 
-    setIsLoading(true);
-    
-    try {
-      // This is where Supabase registration would be implemented
-      console.log("Registering:", { 
-        name: formData.name,
-        companyName: formData.companyName,
-        email: formData.email
-      });
-      
-      toast.success("Account created successfully!");
-      
-      // Redirect to login page after registration
-      setTimeout(() => {
-        navigate("/login");
-      }, 1000);
-    } catch (error) {
-      console.error("Registration error:", error);
-      toast.error("Failed to create account. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
+    await signUp(formData.email, formData.password, formData.name, formData.companyName);
   };
 
   return (
