@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -113,7 +114,7 @@ const fetchProject = async () => {
     
     if (error) throw error;
     
-    // Make sure we properly map the data to our Project interface
+    // Create a properly typed project object
     const projectData: Project = {
       id: data.id,
       title: data.title,
@@ -126,13 +127,13 @@ const fetchProject = async () => {
       admin_id: data.admin_id
     };
     
-    // Assign start_date and end_date only if they exist in the data
-    if ('start_date' in data) {
-      projectData.start_date = data.start_date;
+    // Safely assign start_date and end_date if they exist in the data
+    if ('start_date' in data && data.start_date !== null) {
+      projectData.start_date = data.start_date as string;
     }
     
-    if ('end_date' in data) {
-      projectData.end_date = data.end_date;
+    if ('end_date' in data && data.end_date !== null) {
+      projectData.end_date = data.end_date as string;
     }
     
     setProject(projectData);
