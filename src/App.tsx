@@ -11,6 +11,7 @@ import Projects from "./pages/Projects";
 import Profile from "./pages/Profile";
 import ProjectDetail from "./pages/ProjectDetail";
 import AgendaDetail from "./pages/AgendaDetail";
+import AgendaResults from "./pages/AgendaResults";
 import SuperAdmin from "./pages/SuperAdmin";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
@@ -58,6 +59,14 @@ const AppRoutes = () => (
       element={
         <ProtectedRoute>
           <AgendaDetail />
+        </ProtectedRoute>
+      } 
+    />
+    <Route 
+      path="/projects/:projectId/agenda/:agendaId/results" 
+      element={
+        <ProtectedRoute>
+          <AgendaResults />
         </ProtectedRoute>
       } 
     />

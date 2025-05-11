@@ -61,6 +61,8 @@ export type Database = {
           agenda_id: string
           created_at: string
           description: string | null
+          file_name: string | null
+          file_path: string | null
           id: string
           title: string
         }
@@ -68,6 +70,8 @@ export type Database = {
           agenda_id: string
           created_at?: string
           description?: string | null
+          file_name?: string | null
+          file_path?: string | null
           id?: string
           title: string
         }
@@ -75,6 +79,8 @@ export type Database = {
           agenda_id?: string
           created_at?: string
           description?: string | null
+          file_name?: string | null
+          file_path?: string | null
           id?: string
           title?: string
         }
