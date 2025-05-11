@@ -139,15 +139,21 @@ const AgendaDetail = () => {
       <Breadcrumb className="mb-4">
         <BreadcrumbList>
           <BreadcrumbItem>
-            <BreadcrumbLink as={Link} to="/">Home</BreadcrumbLink>
+            <BreadcrumbLink>
+              <Link to="/">Home</Link>
+            </BreadcrumbLink>
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
-            <BreadcrumbLink as={Link} to="/projects">Projects</BreadcrumbLink>
+            <BreadcrumbLink>
+              <Link to="/projects">Projects</Link>
+            </BreadcrumbLink>
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
-            <BreadcrumbLink as={Link} to={`/projects/${projectId}`}>{project.title}</BreadcrumbLink>
+            <BreadcrumbLink>
+              <Link to={`/projects/${projectId}`}>{project.title}</Link>
+            </BreadcrumbLink>
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -88,7 +87,7 @@ const VotingSummary = ({ projectId }: { projectId: string }) => {
       try {
         const { data, error } = await supabase
           .from('agendas')
-          .select('status')
+          .select('*') // Make sure we select all fields including end_date
           .eq('project_id', projectId);
         
         if (error) throw error;
@@ -332,11 +331,15 @@ const ProjectDetail = () => {
       <Breadcrumb className="mb-4">
         <BreadcrumbList>
           <BreadcrumbItem>
-            <BreadcrumbLink as={Link} to="/">Home</BreadcrumbLink>
+            <BreadcrumbLink>
+              <Link to="/">Home</Link>
+            </BreadcrumbLink>
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
-            <BreadcrumbLink as={Link} to="/projects">Projects</BreadcrumbLink>
+            <BreadcrumbLink>
+              <Link to="/projects">Projects</Link>
+            </BreadcrumbLink>
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
