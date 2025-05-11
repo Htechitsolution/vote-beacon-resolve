@@ -16,6 +16,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 import Navigation from "@/components/layout/Navigation";
+import Head from "@/components/layout/Head";
 import {
   Dialog,
   DialogContent,
@@ -55,19 +56,20 @@ import {
 interface Project {
   id: string;
   title: string;
-  description: string;
+  description: string | null;
   status: string;
   created_at: string;
   updated_at: string;
   start_date: string | null;
   end_date: string | null;
+  admin_id?: string;
 }
 
 interface Agenda {
   id: string;
   title: string;
-  description: string;
-  status: string;
+  description: string | null;
+  status: string | null;
   project_id: string;
   created_at: string;
   updated_at: string;
@@ -112,7 +114,18 @@ const ProjectDetail = () => {
       
       if (error) throw error;
       
-      setProject(data);
+      // Ensure all required Project interface properties exist
+      setProject({
+        id: data.id,
+        title: data.title,
+        description: data.description,
+        status: data.status,
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+        start_date: data.start_date || null,
+        end_date: data.end_date || null,
+        admin_id: data.admin_id
+      });
     } catch (error: any) {
       console.error("Error fetching project:", error.message);
       toast.error("Failed to load project details");
@@ -212,6 +225,7 @@ const ProjectDetail = () => {
     return (
       <div>
         <Navigation />
+        <Head title="Loading Project | E-Voting Platform" />
         <div className="container mx-auto px-4 py-8">
           <div className="flex justify-center items-center h-64">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-evoting-600"></div>
@@ -225,6 +239,7 @@ const ProjectDetail = () => {
     return (
       <div>
         <Navigation />
+        <Head title="Project Not Found | E-Voting Platform" />
         <div className="container mx-auto px-4 py-8">
           <div className="text-center">
             <h1 className="text-2xl font-bold text-red-600">Project Not Found</h1>
@@ -241,6 +256,7 @@ const ProjectDetail = () => {
   return (
     <div>
       <Navigation />
+      <Head title={`${project.title} | E-Voting Platform`} />
       
       <div className="container mx-auto px-4 py-8 max-w-6xl">
         <Breadcrumb className="mb-4">
@@ -425,7 +441,7 @@ const ProjectDetail = () => {
                       <div>
                         <div className="flex items-center gap-2 mb-1">
                           <h3 className="font-semibold text-lg">{agenda.title}</h3>
-                          {getStatusBadge(agenda.status)}
+                          {getStatusBadge(agenda.status || 'draft')}
                         </div>
                         <p className="text-gray-600 line-clamp-2">{agenda.description}</p>
                         <p className="text-xs text-gray-500 mt-2">
