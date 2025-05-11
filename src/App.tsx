@@ -8,6 +8,8 @@ import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Projects from "./pages/Projects";
+import ProjectDetail from "./pages/ProjectDetail";
+import AgendaDetail from "./pages/AgendaDetail";
 import SuperAdmin from "./pages/SuperAdmin";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
@@ -30,6 +32,22 @@ const AppRoutes = () => (
       element={
         <ProtectedRoute>
           <Projects />
+        </ProtectedRoute>
+      } 
+    />
+    <Route 
+      path="/projects/:projectId" 
+      element={
+        <ProtectedRoute>
+          <ProjectDetail />
+        </ProtectedRoute>
+      } 
+    />
+    <Route 
+      path="/projects/:projectId/agenda/:agendaId" 
+      element={
+        <ProtectedRoute>
+          <AgendaDetail />
         </ProtectedRoute>
       } 
     />

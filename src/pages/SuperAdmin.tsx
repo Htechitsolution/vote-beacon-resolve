@@ -15,6 +15,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import SuperAdminRole from "@/components/SuperAdminRole";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
+import { Link } from "react-router-dom";
 
 type Profile = {
   id: string;
@@ -100,6 +110,22 @@ const SuperAdmin = () => {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
+      <Breadcrumb className="mb-4">
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink as={Link} to="/">Home</BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbLink as={Link} to="/projects">Projects</BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbPage>Super Admin Dashboard</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
+      
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
           <h1 className="text-3xl font-bold">User Management</h1>
@@ -107,8 +133,12 @@ const SuperAdmin = () => {
         </div>
         
         <Button className="bg-evoting-600 hover:bg-evoting-700 text-white" asChild>
-          <a href="/projects">Back to Projects</a>
+          <Link to="/projects">Back to Projects</Link>
         </Button>
+      </div>
+      
+      <div className="mb-8">
+        <SuperAdminRole />
       </div>
       
       <div className="mb-8 relative">

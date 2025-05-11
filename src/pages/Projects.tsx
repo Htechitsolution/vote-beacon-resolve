@@ -2,12 +2,40 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Plus, Search, Calendar, ArrowRight } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 
 type Project = {
   id: string;
@@ -15,6 +43,79 @@ type Project = {
   description: string | null;
   status: string;
   created_at: string;
+  admin: {
+    name: string;
+    company_name: string | null;
+  } | null;
+};
+
+// Form schema for creating a new project
+const projectFormSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  description: z.string().optional(),
+});
+
+type ProjectFormValues = z.infer<typeof projectFormSchema>;
+
+const ProjectSummary = () => {
+  const [projectStats, setProjectStats] = useState({
+    total: 0,
+    active: 0,
+    completed: 0
+  });
+
+  useEffect(() => {
+    const fetchProjectStats = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('projects')
+          .select('status')
+        
+        if (error) throw error;
+
+        const stats = {
+          total: data?.length || 0,
+          active: data?.filter(p => p.status === 'active').length || 0,
+          completed: data?.filter(p => p.status === 'completed').length || 0
+        };
+        
+        setProjectStats(stats);
+      } catch (error: any) {
+        console.error("Error fetching project stats:", error.message);
+      }
+    };
+
+    fetchProjectStats();
+  }, []);
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground">Total Projects</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-3xl font-bold">{projectStats.total}</p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground">Active Projects</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-3xl font-bold text-green-600">{projectStats.active}</p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground">Completed Projects</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-3xl font-bold text-blue-600">{projectStats.completed}</p>
+        </CardContent>
+      </Card>
+    </div>
+  );
 };
 
 const ProjectCard = ({ project }: { project: Project }) => {
@@ -43,12 +144,24 @@ const ProjectCard = ({ project }: { project: Project }) => {
       </CardHeader>
       <CardContent>
         <p className="text-gray-600 mb-2">{project.description || "No description"}</p>
-        <p className="text-sm text-gray-500">Created: {new Date(project.created_at).toLocaleDateString()}</p>
+        <div className="flex flex-col gap-1">
+          <p className="text-sm text-gray-500">
+            <Calendar className="inline-block mr-1 h-4 w-4" />
+            Created: {new Date(project.created_at).toLocaleDateString()}
+          </p>
+          {project.admin && (
+            <p className="text-sm text-gray-500">
+              Admin: {project.admin.name}
+              {project.admin.company_name && ` (${project.admin.company_name})`}
+            </p>
+          )}
+        </div>
       </CardContent>
       <CardFooter className="border-t pt-4">
         <Button asChild variant="outline" className="w-full">
           <Link to={`/projects/${project.id}`}>
-            Manage Project
+            <span>Manage Project</span>
+            <ArrowRight className="ml-2 h-4 w-4" />
           </Link>
         </Button>
       </CardFooter>
@@ -60,8 +173,18 @@ const Projects = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
-  const { isSuper } = useAuth();
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const { user, isSuper, profile } = useAuth();
+  const navigate = useNavigate();
   
+  const form = useForm<ProjectFormValues>({
+    resolver: zodResolver(projectFormSchema),
+    defaultValues: {
+      title: "",
+      description: "",
+    },
+  });
+
   useEffect(() => {
     fetchProjects();
   }, []);
@@ -71,7 +194,13 @@ const Projects = () => {
       setLoading(true);
       const { data, error } = await supabase
         .from('projects')
-        .select('*');
+        .select(`
+          *,
+          admin:admin_id(
+            name,
+            company_name
+          )
+        `);
 
       if (error) {
         throw error;
@@ -85,6 +214,39 @@ const Projects = () => {
       setLoading(false);
     }
   };
+
+  const handleCreateProject = async (values: ProjectFormValues) => {
+    try {
+      if (!user) {
+        toast.error("You must be logged in to create a project");
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('projects')
+        .insert([
+          { 
+            title: values.title,
+            description: values.description || null,
+            admin_id: user.id,
+            status: 'draft'
+          }
+        ])
+        .select();
+
+      if (error) {
+        throw error;
+      }
+
+      toast.success("Project created successfully!");
+      setCreateDialogOpen(false);
+      form.reset();
+      fetchProjects();
+    } catch (error: any) {
+      console.error("Error creating project:", error.message);
+      toast.error(error.message || "Failed to create project");
+    }
+  };
   
   const filteredProjects = projects.filter(project => 
     project.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -93,6 +255,18 @@ const Projects = () => {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
+      <Breadcrumb className="mb-4">
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink as={Link} to="/">Home</BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbPage>Projects</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
+
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold">Your Projects</h1>
         
@@ -102,11 +276,16 @@ const Projects = () => {
               <Link to="/admin/dashboard">Super Admin</Link>
             </Button>
           )}
-          <Button className="bg-evoting-600 hover:bg-evoting-700 text-white">
+          <Button 
+            className="bg-evoting-600 hover:bg-evoting-700 text-white"
+            onClick={() => setCreateDialogOpen(true)}
+          >
             <Plus className="mr-2 h-4 w-4" /> New Project
           </Button>
         </div>
       </div>
+      
+      <ProjectSummary />
       
       <div className="mb-8 relative">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
@@ -131,11 +310,71 @@ const Projects = () => {
       ) : (
         <div className="text-center py-20">
           <p className="text-gray-500 mb-4">No projects found matching your search.</p>
-          <Button className="bg-evoting-600 hover:bg-evoting-700 text-white">
+          <Button 
+            className="bg-evoting-600 hover:bg-evoting-700 text-white"
+            onClick={() => setCreateDialogOpen(true)}
+          >
             <Plus className="mr-2 h-4 w-4" /> Create your first project
           </Button>
         </div>
       )}
+
+      {/* Create Project Dialog */}
+      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create New Project</DialogTitle>
+            <DialogDescription>
+              Add a new project to your dashboard.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleCreateProject)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="title"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Project Title</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter project title..." {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description (Optional)</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Enter project description..." 
+                        {...field} 
+                        rows={3}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setCreateDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" className="bg-evoting-600 hover:bg-evoting-700 text-white">
+                  Create Project
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
