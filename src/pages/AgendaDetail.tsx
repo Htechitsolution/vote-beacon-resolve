@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -291,7 +292,10 @@ const AgendaDetail = () => {
                   </Button>
                 )}
                 
-                <Button asChild variant={agenda.status !== 'draft' ? "default" : "outline"}>
+                <Button 
+                  asChild 
+                  variant={agenda.status !== 'draft' ? "default" : "outline"}
+                >
                   <Link to={`/projects/${projectId}/agenda/${agendaId}/results`}>
                     <ChartBar className="mr-2 h-4 w-4" />
                     View Results

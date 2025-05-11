@@ -164,6 +164,7 @@ export type Database = {
       }
       voters: {
         Row: {
+          company_name: string | null
           created_at: string
           email: string
           id: string
@@ -175,6 +176,7 @@ export type Database = {
           voting_weight: number | null
         }
         Insert: {
+          company_name?: string | null
           created_at?: string
           email: string
           id?: string
@@ -186,6 +188,7 @@ export type Database = {
           voting_weight?: number | null
         }
         Update: {
+          company_name?: string | null
           created_at?: string
           email?: string
           id?: string

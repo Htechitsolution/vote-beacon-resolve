@@ -17,6 +17,7 @@ interface AuthContextType {
   signUp: (email: string, password: string, name: string, companyName: string) => Promise<void>;
   signOut: () => Promise<void>;
   isSuper: boolean;
+  resetPassword: (email: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -82,10 +83,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (error) throw error;
       
-      // Check if user has the right role for voter login
+      // For voter login - to be implemented later
       if (role === 'voter') {
-        // For voters, we would need to check against the voters table
-        // This is not implemented yet as it requires more context about the voting flow
+        // This would be handled differently depending on the voter flow
         toast.error("Voter login not implemented yet");
         await signOut();
         return;
@@ -127,6 +127,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const resetPassword = async (email: string) => {
+    try {
+      setIsLoading(true);
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + '/reset-password',
+      });
+      
+      if (error) throw error;
+      
+      toast.success('Password reset email sent! Check your inbox.');
+    } catch (error: any) {
+      console.error('Error resetting password:', error.message);
+      toast.error(error.message || 'Failed to send password reset email');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const signOut = async () => {
     try {
       setIsLoading(true);
@@ -157,7 +175,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       signIn, 
       signUp, 
       signOut,
-      isSuper
+      isSuper,
+      resetPassword
     }}>
       {children}
     </AuthContext.Provider>

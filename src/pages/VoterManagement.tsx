@@ -271,7 +271,6 @@ const VoterManagement = () => {
             <p className="text-gray-600">
               Add and manage voters for {agenda ? `agenda: ${agenda.title}` : `project: ${project?.title}`}
             </p>
-            {/* Removed admin badge as requested */}
           </div>
         </div>
 

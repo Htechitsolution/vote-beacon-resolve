@@ -48,8 +48,6 @@ const Navigation = () => {
 
         {user ? (
           <div className="flex items-center gap-4">
-            {/* Removed role badge as requested */}
-            
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="gap-2">
