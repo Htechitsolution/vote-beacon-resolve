@@ -121,11 +121,19 @@ const fetchProject = async () => {
       status: data.status || 'draft',
       created_at: data.created_at,
       updated_at: data.updated_at,
-      // Explicitly check if these properties exist in the data
-      start_date: data.start_date || null,
-      end_date: data.end_date || null,
+      start_date: null, // Initialize with null as they may not exist in response
+      end_date: null,   // Initialize with null as they may not exist in response
       admin_id: data.admin_id
     };
+    
+    // Assign start_date and end_date only if they exist in the data
+    if ('start_date' in data) {
+      projectData.start_date = data.start_date;
+    }
+    
+    if ('end_date' in data) {
+      projectData.end_date = data.end_date;
+    }
     
     setProject(projectData);
   } catch (error: any) {
