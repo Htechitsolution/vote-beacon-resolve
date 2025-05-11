@@ -317,7 +317,7 @@ const AgendaDetail = () => {
                 </Link>
               </Button>
               
-              {isAdmin && (
+              {isAdmin && agenda.status !== 'closed' && (
                 <Button variant="outline" asChild>
                   <Link to={`/projects/${projectId}/agenda/${agendaId}/voters`}>
                     <Users className="mr-2 h-4 w-4" />
@@ -427,7 +427,7 @@ const AgendaDetail = () => {
                 {voters.length === 0 ? (
                   <div className="text-center py-4">
                     <p className="text-gray-500">No voters have been registered yet.</p>
-                    {isAdmin && (
+                    {isAdmin && agenda.status !== 'closed' && (
                       <Button 
                         className="mt-4 bg-evoting-600 hover:bg-evoting-700 text-white"
                         asChild

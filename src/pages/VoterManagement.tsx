@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import Navigation from "@/components/layout/Navigation";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { X, Search, Users, Percent, Trash2 } from "lucide-react";
+import { X, Search, Users, Percent, Trash2, Download, Upload } from "lucide-react";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -52,6 +52,7 @@ interface Project {
 interface Agenda {
   id: string;
   title: string;
+  status: string;
 }
 
 const voterSchema = z.object({
@@ -75,6 +76,7 @@ const VoterManagement = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [totalWeight, setTotalWeight] = useState(0);
   const [uniqueCompanies, setUniqueCompanies] = useState<Map<string, number>>(new Map());
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<VoterFormValues>({
     resolver: zodResolver(voterSchema),
@@ -122,7 +124,7 @@ const VoterManagement = () => {
     try {
       const { data, error } = await supabase
         .from("agendas")
-        .select("id, title")
+        .select("id, title, status")
         .eq("id", agendaId)
         .single();
 
@@ -187,6 +189,20 @@ const VoterManagement = () => {
         return;
       }
 
+      // Check if voter with the same email already exists for this project
+      const { data: existingVoters, error: checkError } = await supabase
+        .from("voters")
+        .select("id")
+        .eq("project_id", projectId)
+        .eq("email", data.email);
+
+      if (checkError) throw checkError;
+
+      if (existingVoters && existingVoters.length > 0) {
+        toast.error("A voter with this email already exists for this project");
+        return;
+      }
+
       const { error } = await supabase.from("voters").insert([
         {
           project_id: projectId,
@@ -226,11 +242,127 @@ const VoterManagement = () => {
     }
   };
 
+  const downloadVoterTemplate = () => {
+    // Create CSV template
+    const headers = "Name,Email,Company,Voting Weight\n";
+    const example = "John Doe,john@example.com,ACME Inc,1\n";
+    const csvContent = headers + example;
+    
+    // Create a blob and download
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute("href", url);
+    link.setAttribute("download", "voters_template.csv");
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const csvData = event.target?.result as string;
+        const lines = csvData.split("\n");
+        
+        // Remove header row
+        lines.shift();
+        
+        const votersToAdd = [];
+        
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          
+          const [name, email, company, weightStr] = line.split(",");
+          const weight = parseFloat(weightStr) || 1;
+          
+          if (name && email) {
+            votersToAdd.push({
+              project_id: projectId,
+              name: name.trim(),
+              email: email.trim(),
+              company_name: company ? company.trim() : null,
+              voting_weight: weight,
+              status: "pending",
+            });
+          }
+        }
+        
+        if (votersToAdd.length === 0) {
+          toast.error("No valid voters found in the file");
+          return;
+        }
+        
+        // Add voters to database
+        const { data, error } = await supabase
+          .from("voters")
+          .insert(votersToAdd);
+          
+        if (error) {
+          if (error.message.includes("duplicate key")) {
+            toast.error("Some voters could not be added due to duplicate emails");
+          } else {
+            throw error;
+          }
+        } else {
+          toast.success(`${votersToAdd.length} voters added successfully`);
+          fetchVoters();
+        }
+      } catch (error: any) {
+        console.error("Error uploading voters:", error.message);
+        toast.error("Failed to process the uploaded file");
+      }
+      
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    };
+    
+    reader.readAsText(file);
+  };
+
+  const downloadVotersList = () => {
+    // Create CSV with all voters
+    let csvContent = "Name,Email,Company,Voting Weight,Status\n";
+    
+    voters.forEach(voter => {
+      const row = [
+        voter.name,
+        voter.email,
+        voter.company_name || "",
+        voter.voting_weight,
+        voter.status
+      ].join(",");
+      csvContent += row + "\n";
+    });
+    
+    // Create a blob and download
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute("href", url);
+    link.setAttribute("download", `voters_${project?.title || "project"}.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const filteredVoters = voters.filter((voter) =>
     voter.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     voter.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     voter.company_name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const isVotingClosed = agenda?.status === "closed";
 
   return (
     <div>
@@ -306,140 +438,173 @@ const VoterManagement = () => {
                 </div>
               </div>
               
-              {/* Move Add New Voter section here and make it horizontal */}
-              <div className="mt-6 pt-6 border-t border-gray-200">
-                <h3 className="font-medium text-lg mb-4">Add New Voter</h3>
-                
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(addVoter)} className="flex flex-wrap gap-4">
-                    <div className="flex-1 min-w-[200px]">
-                      <FormField
-                        control={form.control}
-                        name="name"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Name</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Voter name" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
+              {!isVotingClosed && (
+                <div className="mt-6 pt-6 border-t border-gray-200">
+                  <h3 className="font-medium text-lg mb-4">Add New Voter</h3>
+                  
+                  <Form {...form}>
+                    <form onSubmit={form.handleSubmit(addVoter)} className="flex flex-wrap gap-4">
+                      <div className="flex-1 min-w-[200px]">
+                        <FormField
+                          control={form.control}
+                          name="name"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Name</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Voter name" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      
+                      <div className="flex-1 min-w-[200px]">
+                        <FormField
+                          control={form.control}
+                          name="email"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Email</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Email address" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      
+                      <div className="flex-1 min-w-[200px]">
+                        <FormField
+                          control={form.control}
+                          name="company_name"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Company Name</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Company name (optional)" {...field} value={field.value || ""} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      
+                      <div className="w-[120px]">
+                        <FormField
+                          control={form.control}
+                          name="voting_weight"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Weight (%)</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  type="number" 
+                                  min="0.01"
+                                  max="100"
+                                  step="0.01"
+                                  placeholder="1" 
+                                  {...field} 
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      
+                      <div className="flex items-end mb-1">
+                        <Button 
+                          type="submit" 
+                          className="bg-evoting-600 hover:bg-evoting-700"
+                        >
+                          Add Voter
+                        </Button>
+                      </div>
+                    </form>
+                  </Form>
+
+                  <div className="flex items-center gap-3 mt-5 border-t pt-4">
+                    <Button variant="outline" onClick={downloadVoterTemplate} className="flex items-center gap-2">
+                      <Download size={16} />
+                      Download Template
+                    </Button>
                     
-                    <div className="flex-1 min-w-[200px]">
-                      <FormField
-                        control={form.control}
-                        name="email"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Email</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Email address" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
+                    <div className="relative">
+                      <input
+                        type="file"
+                        accept=".csv"
+                        ref={fileInputRef}
+                        onChange={handleFileUpload}
+                        className="hidden"
+                        id="csv-upload"
                       />
-                    </div>
-                    
-                    <div className="flex-1 min-w-[200px]">
-                      <FormField
-                        control={form.control}
-                        name="company_name"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Company Name</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Company name (optional)" {...field} value={field.value || ""} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    
-                    <div className="w-[120px]">
-                      <FormField
-                        control={form.control}
-                        name="voting_weight"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Weight (%)</FormLabel>
-                            <FormControl>
-                              <Input 
-                                type="number" 
-                                min="0.01"
-                                max="100"
-                                step="0.01"
-                                placeholder="1" 
-                                {...field} 
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    
-                    <div className="flex items-end mb-1">
-                      <Button 
-                        type="submit" 
-                        className="bg-evoting-600 hover:bg-evoting-700"
-                      >
-                        Add Voter
+                      <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2">
+                        <Upload size={16} />
+                        Upload CSV
                       </Button>
                     </div>
-                  </form>
-                </Form>
-              </div>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
 
-        <Card>
-          <CardHeader className="pb-0">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <CardTitle>Registered Voters</CardTitle>
-              <div className="relative w-full md:w-64">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
-                <Input
-                  placeholder="Search voters..."
-                  className="pl-9"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold">Registered Voters</h2>
+          <div className="flex items-center gap-2">
+            <div className="relative w-64">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+              <Input
+                placeholder="Search voters..."
+                className="pl-9"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
             </div>
-          </CardHeader>
-          <CardContent>
+            <Button 
+              variant="outline" 
+              onClick={downloadVotersList}
+              className="flex items-center gap-2"
+              disabled={voters.length === 0}
+            >
+              <Download size={16} />
+              Export CSV
+            </Button>
+          </div>
+        </div>
+
+        <Card>
+          <CardContent className="p-0">
             {loading ? (
               <div className="flex justify-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-evoting-600"></div>
               </div>
             ) : filteredVoters.length > 0 ? (
-              <div className="border rounded-md mt-4">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Company</TableHead>
-                      <TableHead className="text-right">Weight (%)</TableHead>
-                      <TableHead className="text-right">Status</TableHead>
-                      <TableHead className="w-[80px]">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredVoters.map((voter) => (
-                      <TableRow key={voter.id}>
-                        <TableCell className="font-medium">{voter.name}</TableCell>
-                        <TableCell>{voter.email}</TableCell>
-                        <TableCell>{voter.company_name || "-"}</TableCell>
-                        <TableCell className="text-right">{voter.voting_weight}</TableCell>
-                        <TableCell className="text-right capitalize">{voter.status}</TableCell>
-                        <TableCell>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Company</TableHead>
+                    <TableHead className="text-right">Weight (%)</TableHead>
+                    <TableHead className="text-right">Status</TableHead>
+                    <TableHead className="w-[80px]">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredVoters.map((voter) => (
+                    <TableRow key={voter.id}>
+                      <TableCell className="font-medium">{voter.name}</TableCell>
+                      <TableCell>{voter.email}</TableCell>
+                      <TableCell>{voter.company_name || "-"}</TableCell>
+                      <TableCell className="text-right">{voter.voting_weight}</TableCell>
+                      <TableCell className="text-right capitalize">{voter.status}</TableCell>
+                      <TableCell>
+                        {!isVotingClosed && (
                           <Button
                             variant="ghost"
                             size="icon"
@@ -449,12 +614,12 @@ const VoterManagement = () => {
                             <Trash2 className="h-4 w-4 text-red-500" />
                             <span className="sr-only">Delete</span>
                           </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             ) : (
               <div className="text-center py-8">
                 <p className="text-gray-500">No voters found. {searchTerm && "Try adjusting your search."}</p>

@@ -163,8 +163,8 @@ const VotingSummary = ({ projectId }: { projectId: string }) => {
 };
 
 const AgendaCard = ({ agenda }: { agenda: Agenda }) => {
-  const isActive = agenda.status === 'active' && 
-    agenda.end_date && new Date(agenda.end_date) > new Date();
+  const isActive = agenda.status === 'live';
+  const isClosed = agenda.status === 'closed';
 
   const formatDateTime = (dateString: string | null) => {
     if (!dateString) return 'Not set';
@@ -172,16 +172,24 @@ const AgendaCard = ({ agenda }: { agenda: Agenda }) => {
   };
 
   return (
-    <Card className={`hover:shadow-md transition-shadow ${!isActive ? 'bg-gray-50' : 'border-green-400 border-2'}`}>
+    <Card className={`hover:shadow-md transition-shadow ${
+      isActive ? 'border-green-400 border-2' : 
+      isClosed ? 'bg-gray-50' : ''
+    }`}>
       <CardHeader>
         <div className="flex justify-between items-start">
-          <CardTitle className={`text-xl ${!isActive ? 'text-gray-700' : 'text-green-700'}`}>
+          <CardTitle className={`text-xl ${
+            isActive ? 'text-green-700' : 
+            isClosed ? 'text-gray-700' : ''
+          }`}>
             {agenda.title}
           </CardTitle>
           <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-            isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+            isActive ? 'bg-green-100 text-green-800' : 
+            isClosed ? 'bg-gray-100 text-gray-800' : 
+            'bg-yellow-100 text-yellow-800'
           }`}>
-            {isActive ? 'Active' : 'Closed'}
+            {isActive ? 'Live' : isClosed ? 'Closed' : 'Draft'}
           </span>
         </div>
       </CardHeader>
@@ -322,7 +330,7 @@ const ProjectDetail = () => {
             title: values.title,
             description: values.description || null,
             project_id: projectId,
-            status: 'draft',
+            status: 'draft', // Ensure default status is 'draft' 
             voting_type: 'single_choice'
           }
         ])
