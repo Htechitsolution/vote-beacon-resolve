@@ -8,6 +8,7 @@ import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { useAuth } from "@/contexts/AuthContext";
 import { ArrowLeft } from "lucide-react";
+import { toast } from "sonner";
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState("");
@@ -16,8 +17,15 @@ const ForgotPassword = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await resetPassword(email);
-    setSubmitted(true);
+    try {
+      await resetPassword(email);
+      // For now, show success message even if the actual email sending fails
+      // This allows testing the flow until the email service is properly configured
+      setSubmitted(true);
+    } catch (error) {
+      // Error is already handled in AuthContext, just log it here
+      console.error("Password reset error:", error);
+    }
   };
 
   return (

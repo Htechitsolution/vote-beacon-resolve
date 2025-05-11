@@ -17,20 +17,8 @@ const Header = () => {
           </span>
         </Link>
 
-        {/* Desktop Navigation */}
+        {/* Desktop Navigation - Removed links for home, features, pricing and contact */}
         <nav className="hidden md:flex items-center gap-6">
-          <Link to="/" className="text-gray-600 hover:text-evoting-600 font-medium">
-            Home
-          </Link>
-          <Link to="/features" className="text-gray-600 hover:text-evoting-600 font-medium">
-            Features
-          </Link>
-          <Link to="/pricing" className="text-gray-600 hover:text-evoting-600 font-medium">
-            Pricing
-          </Link>
-          <Link to="/contact" className="text-gray-600 hover:text-evoting-600 font-medium">
-            Contact
-          </Link>
           <Button 
             variant="outline"
             className="ml-4"
@@ -55,38 +43,10 @@ const Header = () => {
           {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
 
-        {/* Mobile Navigation */}
+        {/* Mobile Navigation - Removed links for home, features, pricing and contact */}
         {isMenuOpen && (
           <div className="absolute top-full left-0 w-full bg-white border-b border-gray-200 shadow-lg md:hidden">
             <div className="container mx-auto px-4 py-4 flex flex-col gap-4">
-              <Link 
-                to="/" 
-                className="text-gray-600 hover:text-evoting-600 font-medium py-2"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Home
-              </Link>
-              <Link 
-                to="/features" 
-                className="text-gray-600 hover:text-evoting-600 font-medium py-2"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Features
-              </Link>
-              <Link 
-                to="/pricing" 
-                className="text-gray-600 hover:text-evoting-600 font-medium py-2"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Pricing
-              </Link>
-              <Link 
-                to="/contact" 
-                className="text-gray-600 hover:text-evoting-600 font-medium py-2"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Contact
-              </Link>
               <div className="flex flex-col sm:flex-row gap-3 pt-2">
                 <Button 
                   variant="outline"

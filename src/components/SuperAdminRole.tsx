@@ -21,73 +21,42 @@ const SuperAdminRole = () => {
   useEffect(() => {
     const setSuperAdmin = async () => {
       try {
-        const superAdminEmail = "harshalgandhi12@yahoo.com";
+        const superAdminEmails = [
+          "harshalgandhi12@yahoo.com",
+          "harshalgandhi12@gmail.com"  // Added as a super admin
+        ];
         
-        // Find the user's profile by email
-        const { data: profiles, error: profileError } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('email', superAdminEmail)
-          .limit(1);
+        for (const superAdminEmail of superAdminEmails) {
+          // Find the user's profile by email
+          const { data: profiles, error: profileError } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('email', superAdminEmail)
+            .limit(1);
 
-        if (profileError) throw profileError;
+          if (profileError) throw profileError;
 
-        if (!profiles || profiles.length === 0) {
-          console.log("Super admin user not found");
-          return;
+          if (!profiles || profiles.length === 0) {
+            console.log(`Super admin user not found: ${superAdminEmail}`);
+            continue;
+          }
+
+          // Update the user's role to super_admin
+          const { error: updateError } = await supabase
+            .from('profiles')
+            .update({ role: 'super_admin' })
+            .eq('id', profiles[0].id);
+
+          if (updateError) throw updateError;
+          
+          console.log("Super admin rights granted to", superAdminEmail);
         }
-
-        // Update the user's role to super_admin
-        const { error: updateError } = await supabase
-          .from('profiles')
-          .update({ role: 'super_admin' })
-          .eq('id', profiles[0].id);
-
-        if (updateError) throw updateError;
-        
-        console.log("Super admin rights granted to", superAdminEmail);
-        
       } catch (error: any) {
         console.error("Error setting super admin:", error.message);
       }
     };
     
-    // Make voter admin
-    const setVoterAdmin = async () => {
-      try {
-        const voterEmail = "harshalgandhi12@gmail.com";
-        
-        // Find the user's profile by email
-        const { data: profiles, error: profileError } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('email', voterEmail)
-          .limit(1);
-
-        if (profileError) throw profileError;
-
-        if (!profiles || profiles.length === 0) {
-          console.log("Voter admin user not found");
-          return;
-        }
-
-        // Update the user's role to admin (assume they'll manage voters)
-        const { error: updateError } = await supabase
-          .from('profiles')
-          .update({ role: 'admin' })
-          .eq('id', profiles[0].id);
-
-        if (updateError) throw updateError;
-        
-        console.log("Admin rights granted to voter admin:", voterEmail);
-        
-      } catch (error: any) {
-        console.error("Error setting voter admin:", error.message);
-      }
-    };
-    
     setSuperAdmin();
-    setVoterAdmin();
   }, []);
 
   const makeSuperAdmin = async () => {
