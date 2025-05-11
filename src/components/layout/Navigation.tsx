@@ -43,9 +43,6 @@ const Navigation = () => {
                 Admin Dashboard
               </Link>
             )}
-            <Link to="/contact" className="text-gray-600 hover:text-evoting-600 font-medium">
-              Contact
-            </Link>
           </div>
         </div>
 
@@ -123,13 +120,6 @@ const Navigation = () => {
                   Admin Dashboard
                 </Link>
               )}
-              <Link 
-                to="/contact" 
-                className="text-gray-600 hover:text-evoting-600 font-medium py-2"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Contact
-              </Link>
               <Link 
                 to="/profile" 
                 className="text-gray-600 hover:text-evoting-600 font-medium py-2"

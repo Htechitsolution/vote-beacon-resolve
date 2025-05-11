@@ -32,36 +32,21 @@ serve(async (req) => {
       throw new Error("Missing required fields");
     }
 
-    console.log("Sending contact email with data:", { name, email, message });
-
-    // Store the contact message in a database table
-    const { error: dbError } = await supabase
-      .from('contact_messages')
-      .insert([{ name, email, message, created_at: new Date().toISOString() }]);
-
-    if (dbError) {
-      console.error("Error storing contact message:", dbError);
-      // Continue anyway to try sending the email
-    }
-
-    // Use the more reliable built-in email function
-    const { error } = await supabase.functions.invoke("send-custom-email", {
-      body: {
-        to: "harshalgandhi12@gmail.com",
-        subject: `Contact Form Submission from ${name}`,
-        html: `
-          <h1>New Contact Form Submission</h1>
-          <p><strong>Name:</strong> ${name}</p>
-          <p><strong>Email:</strong> ${email}</p>
-          <p><strong>Message:</strong></p>
-          <p>${message.replace(/\n/g, "<br />")}</p>
-        `,
-      },
+    // Send email using Supabase Email (this requires email to be set up in Supabase)
+    const { error } = await supabase.auth.admin.sendEmail({
+      email: "harshalgandhi12@yahoo.com", // Change to your admin email
+      subject: `Contact Form Submission from ${name}`,
+      html: `
+        <h1>New Contact Form Submission</h1>
+        <p><strong>Name:</strong> ${name}</p>
+        <p><strong>Email:</strong> ${email}</p>
+        <p><strong>Message:</strong></p>
+        <p>${message.replace(/\n/g, "<br />")}</p>
+      `,
     });
 
     if (error) {
-      console.error("Error invoking send-custom-email function:", error);
-      throw new Error("Failed to send email: " + error.message);
+      throw error;
     }
 
     console.log("Email sent successfully");

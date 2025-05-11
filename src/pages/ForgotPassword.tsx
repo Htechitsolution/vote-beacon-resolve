@@ -8,7 +8,6 @@ import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { useAuth } from "@/contexts/AuthContext";
 import { ArrowLeft } from "lucide-react";
-import { toast } from "sonner";
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState("");
@@ -17,20 +16,8 @@ const ForgotPassword = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!email) {
-      toast.error("Please enter your email address");
-      return;
-    }
-    
-    try {
-      await resetPassword(email);
-      toast.success("Password reset email sent! Check your inbox.");
-      setSubmitted(true);
-    } catch (error) {
-      console.error("Error sending reset email:", error);
-      toast.error("Failed to send password reset email. Please try again.");
-    }
+    await resetPassword(email);
+    setSubmitted(true);
   };
 
   return (
