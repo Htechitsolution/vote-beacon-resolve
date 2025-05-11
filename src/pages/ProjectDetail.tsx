@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -103,38 +102,40 @@ const ProjectDetail = () => {
     }
   }, [projectId]);
   
-  const fetchProject = async () => {
-    try {
-      setIsLoadingProject(true);
-      const { data, error } = await supabase
-        .from("projects")
-        .select("*")
-        .eq("id", projectId)
-        .single();
-      
-      if (error) throw error;
-      
-      // Create a properly typed Project object with all required fields
-      const projectData: Project = {
-        id: data.id,
-        title: data.title,
-        description: data.description,
-        status: data.status,
-        created_at: data.created_at,
-        updated_at: data.updated_at,
-        start_date: data.start_date || null,
-        end_date: data.end_date || null,
-        admin_id: data.admin_id
-      };
-      
-      setProject(projectData);
-    } catch (error: any) {
-      console.error("Error fetching project:", error.message);
-      toast.error("Failed to load project details");
-    } finally {
-      setIsLoadingProject(false);
-    }
-  };
+const fetchProject = async () => {
+  try {
+    setIsLoadingProject(true);
+    const { data, error } = await supabase
+      .from("projects")
+      .select("*")
+      .eq("id", projectId)
+      .single();
+    
+    if (error) throw error;
+    
+    // Create a properly typed Project object with all required fields
+    const projectData: Project = {
+      id: data.id,
+      title: data.title,
+      description: data.description,
+      // @ts-ignore
+      status: data.status,
+      created_at: data.created_at,
+      updated_at: data.updated_at,
+      // Check if start_date and end_date exist in the data, otherwise set to null
+      start_date: data.start_date || null,
+      end_date: data.end_date || null,
+      admin_id: data.admin_id
+    };
+    
+    setProject(projectData);
+  } catch (error: any) {
+    console.error("Error fetching project:", error.message);
+    toast.error("Failed to load project details");
+  } finally {
+    setIsLoadingProject(false);
+  }
+};
   
   const fetchAgendas = async () => {
     try {
