@@ -18,7 +18,7 @@ const Index = () => {
             <div className="max-w-3xl mx-auto text-center">
               
               <h1 className="text-4xl md:text-6xl font-bold mb-6 animate-fade-in">
-                <Vote className="h-16 w-16 text-white" />
+              
                 Secure E-Voting Solutions for Resolution Professionals
               </h1>
               <p className="text-xl mb-8 opacity-90 animate-fade-up">
