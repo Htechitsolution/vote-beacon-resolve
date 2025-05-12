@@ -16,6 +16,7 @@ const Index = () => {
         <section className="hero-gradient text-white">
           <div className="container mx-auto px-4 py-20 md:py-32">
             <div className="max-w-3xl mx-auto text-center">
+              <Vote className="h-16 w-16 text-white" />
               <h1 className="text-4xl md:text-6xl font-bold mb-6 animate-fade-in">
                 Secure E-Voting Solutions for Resolution Professionals
               </h1>
