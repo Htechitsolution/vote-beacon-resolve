@@ -17,14 +17,19 @@ const Header = () => {
           </span>
         </Link>
 
-        {/* Desktop Navigation - Removed links for home, features, pricing and contact */}
+        {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center gap-6">
           <Button 
+            variant="ghost"
+            onClick={() => navigate("/voter-login")}
+          >
+            Voter Login
+          </Button>
+          <Button 
             variant="outline"
-            className="ml-4"
             onClick={() => navigate("/login")}
           >
-            Login
+            Admin Login
           </Button>
           <Button 
             className="bg-evoting-600 hover:bg-evoting-700 text-white"
@@ -43,11 +48,21 @@ const Header = () => {
           {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
 
-        {/* Mobile Navigation - Removed links for home, features, pricing and contact */}
+        {/* Mobile Navigation */}
         {isMenuOpen && (
           <div className="absolute top-full left-0 w-full bg-white border-b border-gray-200 shadow-lg md:hidden">
             <div className="container mx-auto px-4 py-4 flex flex-col gap-4">
               <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                <Button 
+                  variant="ghost"
+                  className="w-full"
+                  onClick={() => {
+                    navigate("/voter-login");
+                    setIsMenuOpen(false);
+                  }}
+                >
+                  Voter Login
+                </Button>
                 <Button 
                   variant="outline"
                   className="w-full"
@@ -56,7 +71,7 @@ const Header = () => {
                     setIsMenuOpen(false);
                   }}
                 >
-                  Login
+                  Admin Login
                 </Button>
                 <Button 
                   className="w-full bg-evoting-600 hover:bg-evoting-700 text-white"

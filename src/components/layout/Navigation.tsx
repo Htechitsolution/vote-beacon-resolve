@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -77,7 +76,7 @@ const Navigation = () => {
                 <Link to="/voter-login">Voter Login</Link>
               </Button>
               <Button asChild variant="outline">
-                <Link to="/login">Login</Link>
+                <Link to="/login">Admin Login</Link>
               </Button>
               <Button asChild>
                 <Link to="/register">Register</Link>
@@ -152,7 +151,7 @@ const Navigation = () => {
                   className="justify-start"
                   onClick={() => setIsOpen(false)}
                 >
-                  <Link to="/login">Login</Link>
+                  <Link to="/login">Admin Login</Link>
                 </Button>
                 <Button
                   asChild

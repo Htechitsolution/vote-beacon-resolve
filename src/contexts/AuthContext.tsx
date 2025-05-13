@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Session, User } from '@supabase/supabase-js';
@@ -95,16 +94,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (error) throw error;
       
-      // For voter login - to be implemented later
       if (role === 'voter') {
-        // This would be handled differently depending on the voter flow
-        toast.error("Voter login not implemented yet");
-        await signOut();
-        return;
+        // For voter login - redirect to voter dashboard
+        toast.success('Signed in successfully!');
+        navigate('/voter-dashboard');
+      } else {
+        // For admin login
+        toast.success('Signed in successfully!');
+        navigate('/projects');
       }
-      
-      toast.success('Signed in successfully!');
-      navigate('/projects');
     } catch (error: any) {
       console.error('Error signing in:', error.message);
       toast.error(error.message || 'Failed to sign in');

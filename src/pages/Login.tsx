@@ -4,7 +4,6 @@ import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toast } from "sonner";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
@@ -14,7 +13,6 @@ const Login = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState("voter");
   const { signIn, isLoading, user } = useAuth();
 
   useEffect(() => {
@@ -32,7 +30,8 @@ const Login = () => {
       return;
     }
 
-    await signIn(email, password, role);
+    // Pass 'admin' as the role since this is the admin login page
+    await signIn(email, password, 'admin');
   };
 
   return (
@@ -42,8 +41,8 @@ const Login = () => {
       <main className="flex-grow flex items-center justify-center py-12">
         <div className="w-full max-w-md p-6 md:p-8 bg-white rounded-lg shadow-lg border border-gray-200">
           <div className="text-center mb-8">
-            <h1 className="text-2xl font-bold mb-2">Welcome Back</h1>
-            <p className="text-gray-600">Sign in to your account to continue</p>
+            <h1 className="text-2xl font-bold mb-2">Admin Login</h1>
+            <p className="text-gray-600">Sign in to your account to manage meetings</p>
           </div>
           
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -71,20 +70,6 @@ const Login = () => {
               />
             </div>
             
-            <div className="space-y-2">
-              <Label>Login As</Label>
-              <RadioGroup value={role} onValueChange={setRole} className="flex gap-6">
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="admin" id="admin" />
-                  <Label htmlFor="admin" className="cursor-pointer">Admin</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="voter" id="voter" />
-                  <Label htmlFor="voter" className="cursor-pointer">Voter</Label>
-                </div>
-              </RadioGroup>
-            </div>
-            
             <div className="flex justify-end">
               <Link 
                 to="/forgot-password"
@@ -108,6 +93,12 @@ const Login = () => {
               Don't have an account?{" "}
               <Link to="/register" className="text-evoting-600 hover:underline">
                 Create one
+              </Link>
+            </p>
+            <p className="mt-3 text-gray-600">
+              Are you a voter?{" "}
+              <Link to="/voter-login" className="text-evoting-600 hover:underline">
+                Login here
               </Link>
             </p>
           </div>
