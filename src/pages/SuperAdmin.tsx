@@ -14,7 +14,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/use-toast";
 import Navigation from "@/components/layout/Navigation";
 import SuperAdminRole from "@/components/SuperAdminRole";
 import {
@@ -61,7 +61,10 @@ const SuperAdmin = () => {
       setUsers(data || []);
     } catch (error: any) {
       console.error("Error fetching users:", error.message);
-      toast.error("Failed to load users");
+      toast({
+        title: "Error",
+        description: "Failed to load users"
+      });
     } finally {
       setLoading(false);
     }
