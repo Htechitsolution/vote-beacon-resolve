@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -82,8 +81,7 @@ const ProjectDetail = () => {
       setProject(data);
     } catch (error: any) {
       console.error("Error fetching project:", error.message);
-      toast({
-        title: "Error", 
+      toast("Error", {
         description: "Failed to load project", 
         variant: "destructive"
       });
@@ -105,8 +103,7 @@ const ProjectDetail = () => {
       setAgendas(data || []);
     } catch (error: any) {
       console.error("Error fetching agendas:", error.message);
-      toast({
-        title: "Error", 
+      toast("Error", {
         description: "Failed to load agendas",
         variant: "destructive"
       });
@@ -126,8 +123,7 @@ const ProjectDetail = () => {
   const handleCreateAgenda = async () => {
     try {
       if (!newAgendaTitle || !newAgendaDescription) {
-        toast({
-          title: "Error", 
+        toast("Error", {
           description: "Please fill in all fields",
           variant: "destructive"
         });
@@ -135,8 +131,7 @@ const ProjectDetail = () => {
       }
 
       if (!projectId) {
-        toast({
-          title: "Error", 
+        toast("Error", {
           description: "Project ID is missing",
           variant: "destructive"
         });
@@ -161,14 +156,12 @@ const ProjectDetail = () => {
 
       setAgendas([...agendas, ...(data || [])]);
       handleCloseCreateAgendaDialog();
-      toast({
-        title: "Success",
+      toast("Success", {
         description: "Meeting created successfully!"
       });
     } catch (error: any) {
       console.error("Error creating agenda:", error.message);
-      toast({
-        title: "Error", 
+      toast("Error", {
         description: "Failed to create meeting",
         variant: "destructive"
       });

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -80,8 +79,7 @@ const Checkout = () => {
 
   const handleCheckout = async () => {
     if (!selectedPlanId) {
-      toast({
-        title: "No plan selected",
+      toast("No plan selected", {
         description: "Please select a subscription plan to continue",
         variant: "destructive"
       });
@@ -94,15 +92,13 @@ const Checkout = () => {
       // Mock payment process
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      toast({
-        title: "Payment successful!",
+      toast("Payment successful!", {
         description: "Your credits have been added to your account"
       });
       
       navigate('/projects');
     } catch (error: any) {
-      toast({
-        title: "Payment failed",
+      toast("Payment failed", {
         description: error.message || "An error occurred during payment processing",
         variant: "destructive"
       });

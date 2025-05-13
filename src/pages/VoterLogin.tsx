@@ -20,10 +20,8 @@ const VoterLogin = () => {
     e.preventDefault();
     
     if (!email) {
-      toast({
-        title: "Error",
-        description: "Please enter your email",
-        variant: "destructive"
+      toast("Please enter your email", {
+        description: "Email is required to log in",
       });
       return;
     }
@@ -40,8 +38,7 @@ const VoterLogin = () => {
       if (voterError) throw voterError;
       
       if (!voterData || voterData.length === 0) {
-        toast({
-          title: "Error",
+        toast("Error", {
           description: "This email is not registered as a voter for any meetings",
           variant: "destructive"
         });
@@ -70,8 +67,7 @@ const VoterLogin = () => {
           
           if (signUpError) throw signUpError;
           
-          toast({
-            title: "Success",
+          toast("Success", {
             description: "Account created successfully! Please login now."
           });
           
@@ -83,8 +79,7 @@ const VoterLogin = () => {
           
           if (loginError) throw loginError;
           
-          toast({
-            title: "Success",
+          toast("Success", {
             description: "Logged in successfully"
           });
           navigate('/voter-dashboard');
@@ -98,16 +93,14 @@ const VoterLogin = () => {
           .update({ status: 'active' })
           .eq('email', email.trim().toLowerCase());
         
-        toast({
-          title: "Success",
+        toast("Success", {
           description: "Logged in successfully"
         });
         navigate('/voter-dashboard');
       }
     } catch (error: any) {
       console.error('Login error:', error.message);
-      toast({
-        title: "Error",
+      toast("Error", {
         description: error.message,
         variant: "destructive"
       });

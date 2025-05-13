@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -52,8 +51,7 @@ const VoterDashboard = () => {
       const email = user.email;
       
       if (!email) {
-        toast({
-          title: "Error",
+        toast("Error", {
           description: "Unable to find voter information",
           variant: "destructive"
         });
@@ -97,8 +95,7 @@ const VoterDashboard = () => {
       setMeetings(formattedMeetings);
     } catch (error: any) {
       console.error('Error fetching meetings:', error.message);
-      toast({
-        title: "Error",
+      toast("Error", {
         description: "Failed to load your meetings",
         variant: "destructive"
       });
@@ -111,14 +108,12 @@ const VoterDashboard = () => {
     try {
       await supabase.auth.signOut();
       navigate('/voter-login');
-      toast({
-        title: "Success",
+      toast("Success", {
         description: "Logged out successfully"
       });
     } catch (error: any) {
       console.error('Logout error:', error.message);
-      toast({
-        title: "Error",
+      toast("Error", {
         description: "Failed to log out",
         variant: "destructive"
       });

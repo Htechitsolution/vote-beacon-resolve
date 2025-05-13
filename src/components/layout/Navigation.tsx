@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -26,14 +25,12 @@ const Navigation = () => {
     try {
       await supabase.auth.signOut();
       navigate('/login');
-      toast({
-        title: "Success",
+      toast("Success", {
         description: "Logged out successfully"
       });
     } catch (error) {
       console.error('Logout error:', error);
-      toast({
-        title: "Error",
+      toast("Error", {
         description: "Failed to log out",
         variant: "destructive"
       });
