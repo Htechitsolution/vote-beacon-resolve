@@ -225,7 +225,7 @@ const AdminDashboard = () => {
           <h1 className="text-2xl font-bold text-red-600">Access Denied</h1>
           <p className="mt-2">You don't have permission to access this page.</p>
           <Button className="mt-4 bg-evoting-600 hover:bg-evoting-700 text-white" asChild>
-            <Link to="/projects">Back to Projects</a>
+            <Link to="/projects">Back to Projects</Link>
           </Button>
         </div>
       </div>
