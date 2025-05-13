@@ -103,6 +103,78 @@ const TableCaption = React.forwardRef<
 ))
 TableCaption.displayName = "TableCaption"
 
+// New component to display the voting results visually
+const TableVotingStatus = React.forwardRef<
+  HTMLDivElement, 
+  React.HTMLAttributes<HTMLDivElement> & { 
+    approved?: number; 
+    disapproved?: number; 
+    abstained?: number;
+    requiredApproval?: number;
+  }
+>(({ className, approved = 0, disapproved = 0, abstained = 0, requiredApproval = 50, ...props }, ref) => {
+  const total = approved + disapproved + abstained;
+  const approvedPercent = total > 0 ? (approved / total * 100) : 0;
+  const disapprovedPercent = total > 0 ? (disapproved / total * 100) : 0;
+  const abstainedPercent = total > 0 ? (abstained / total * 100) : 0;
+  
+  const isPassing = approvedPercent >= requiredApproval;
+
+  return (
+    <div 
+      ref={ref} 
+      className={cn("flex flex-col space-y-1", className)} 
+      {...props}
+    >
+      <div className="flex h-2 w-full overflow-hidden rounded-full bg-gray-100">
+        {approved > 0 && (
+          <div 
+            className="h-full bg-green-500" 
+            style={{ width: `${approvedPercent}%` }}
+          />
+        )}
+        {disapproved > 0 && (
+          <div 
+            className="h-full bg-red-500" 
+            style={{ width: `${disapprovedPercent}%` }}
+          />
+        )}
+        {abstained > 0 && (
+          <div 
+            className="h-full bg-gray-400" 
+            style={{ width: `${abstainedPercent}%` }}
+          />
+        )}
+      </div>
+      <div className="flex justify-between text-xs text-gray-600">
+        <div className="flex items-center gap-1">
+          <span className={`font-medium ${isPassing ? "text-green-600" : "text-gray-600"}`}>
+            {approvedPercent.toFixed(0)}% Approved
+          </span>
+          {requiredApproval > 0 && (
+            <span className="text-gray-400">
+              (min {requiredApproval}%)
+            </span>
+          )}
+        </div>
+        <div className="flex gap-3 text-xs">
+          {disapproved > 0 && (
+            <span className="text-red-600">
+              {disapprovedPercent.toFixed(0)}% Against
+            </span>
+          )}
+          {abstained > 0 && (
+            <span className="text-gray-500">
+              {abstainedPercent.toFixed(0)}% Abstained
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+})
+TableVotingStatus.displayName = "TableVotingStatus"
+
 export {
   Table,
   TableHeader,
@@ -112,4 +184,5 @@ export {
   TableRow,
   TableCell,
   TableCaption,
+  TableVotingStatus
 }
