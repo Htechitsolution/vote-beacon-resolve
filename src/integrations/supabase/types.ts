@@ -64,6 +64,7 @@ export type Database = {
           file_name: string | null
           file_path: string | null
           id: string
+          required_approval: number | null
           title: string
         }
         Insert: {
@@ -73,6 +74,7 @@ export type Database = {
           file_name?: string | null
           file_path?: string | null
           id?: string
+          required_approval?: number | null
           title: string
         }
         Update: {
@@ -82,6 +84,7 @@ export type Database = {
           file_name?: string | null
           file_path?: string | null
           id?: string
+          required_approval?: number | null
           title?: string
         }
         Relationships: [
