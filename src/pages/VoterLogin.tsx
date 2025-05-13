@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { toast } from '@/components/ui/use-toast';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
@@ -20,8 +20,9 @@ const VoterLogin = () => {
     e.preventDefault();
     
     if (!email) {
-      toast("Please enter your email", {
-        description: "Email is required to log in",
+      toast({
+        title: "Please enter your email",
+        description: "Email is required to log in"
       });
       return;
     }
@@ -38,7 +39,8 @@ const VoterLogin = () => {
       if (voterError) throw voterError;
       
       if (!voterData || voterData.length === 0) {
-        toast("Error", {
+        toast({
+          title: "Error",
           description: "This email is not registered as a voter for any meetings",
           variant: "destructive"
         });
@@ -67,7 +69,8 @@ const VoterLogin = () => {
           
           if (signUpError) throw signUpError;
           
-          toast("Success", {
+          toast({
+            title: "Success",
             description: "Account created successfully! Please login now."
           });
           
@@ -79,7 +82,8 @@ const VoterLogin = () => {
           
           if (loginError) throw loginError;
           
-          toast("Success", {
+          toast({
+            title: "Success",
             description: "Logged in successfully"
           });
           navigate('/voter-dashboard');
@@ -93,14 +97,16 @@ const VoterLogin = () => {
           .update({ status: 'active' })
           .eq('email', email.trim().toLowerCase());
         
-        toast("Success", {
+        toast({
+          title: "Success",
           description: "Logged in successfully"
         });
         navigate('/voter-dashboard');
       }
     } catch (error: any) {
       console.error('Login error:', error.message);
-      toast("Error", {
+      toast({
+        title: "Error",
         description: error.message,
         variant: "destructive"
       });
@@ -112,61 +118,73 @@ const VoterLogin = () => {
   return (
     <div className="flex flex-col min-h-screen">
       <Header />
-      <div className="flex-grow flex items-center justify-center bg-gray-50 px-4 py-12 bg-[url('/background.jpg')] bg-cover bg-center">
+      <div className="flex-grow flex items-center justify-center px-4 py-12 bg-[url('/background.jpg')] bg-cover bg-center">
         <div className="w-full max-w-md">
           <div className="mb-8 text-center">
             <h1 className="text-3xl font-bold text-white drop-shadow-md">Voter Login</h1>
             <p className="mt-2 text-gray-100 drop-shadow-md">
-              Login with your email to access meetings
+              Login with your email to access meetings and cast your votes
             </p>
           </div>
           
-          <Card className="bg-white/95 backdrop-blur-sm">
-            <CardHeader>
-              <CardTitle>Login</CardTitle>
-              <CardDescription>
-                Enter your email to login and vote
+          <Card className="bg-white/95 backdrop-blur-sm shadow-xl">
+            <CardHeader className="space-y-1">
+              <CardTitle className="text-2xl text-center">Welcome Back</CardTitle>
+              <CardDescription className="text-center">
+                Enter your email to access your meetings
               </CardDescription>
             </CardHeader>
             
             <form onSubmit={handleLogin}>
-              <CardContent>
-                <div className="grid gap-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="name@example.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                    />
-                  </div>
-                  
-                  <div className="grid gap-2">
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email Address</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="name@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="h-11"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
                     <Label htmlFor="password">Password</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      disabled
-                    />
-                    <p className="text-xs text-gray-500">Default password: Voter@1234</p>
+                    <span className="text-xs text-gray-500">Pre-configured</span>
                   </div>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    disabled
+                    className="h-11 bg-gray-50"
+                  />
+                  <p className="text-xs text-gray-500">Using default password: Voter@1234</p>
                 </div>
               </CardContent>
               
-              <CardFooter>
+              <CardFooter className="flex flex-col space-y-4">
                 <Button 
-                  className="w-full bg-evoting-600 hover:bg-evoting-700" 
+                  className="w-full h-11 text-base bg-evoting-600 hover:bg-evoting-700" 
                   type="submit"
                   disabled={isLoading}
                 >
-                  {isLoading ? "Logging in..." : "Log In"}
+                  {isLoading ? "Logging in..." : "Log In as Voter"}
                 </Button>
+                
+                <div className="w-full text-center space-y-2">
+                  <p className="text-sm text-gray-500">
+                    Are you an administrator?
+                  </p>
+                  <Button variant="outline" asChild className="w-full">
+                    <Link to="/login">Admin Login</Link>
+                  </Button>
+                </div>
               </CardFooter>
             </form>
           </Card>

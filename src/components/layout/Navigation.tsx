@@ -1,9 +1,10 @@
+
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Menu, X, LogOut, User, FileText, LayoutDashboard, CreditCard } from "lucide-react";
+import { Menu, X, LogOut, User, FileText, LayoutDashboard, IndianRupee } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 
 interface NavLink {
@@ -25,12 +26,14 @@ const Navigation = () => {
     try {
       await supabase.auth.signOut();
       navigate('/login');
-      toast("Success", {
+      toast({
+        title: "Success",
         description: "Logged out successfully"
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Logout error:', error);
-      toast("Error", {
+      toast({
+        title: "Error",
         description: "Failed to log out",
         variant: "destructive"
       });
@@ -94,7 +97,7 @@ const Navigation = () => {
                 onClick={() => navigate('/checkout')}
                 className="flex items-center gap-2"
               >
-                <CreditCard className="mr-1 h-4 w-4" />
+                <IndianRupee className="mr-1 h-4 w-4" />
                 Buy Credits
               </Button>
               <Button variant="outline" onClick={handleLogout} className="flex items-center gap-2">
@@ -163,7 +166,7 @@ const Navigation = () => {
                     setIsOpen(false);
                   }}
                 >
-                  <CreditCard className="mr-2 h-4 w-4" />
+                  <IndianRupee className="mr-2 h-4 w-4" />
                   Buy Credits
                 </Button>
                 <Button

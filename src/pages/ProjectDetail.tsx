@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -5,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Calendar, Users, CreditCard } from "lucide-react";
+import { Plus, Calendar, Users, CreditCard, IndianRupee } from "lucide-react";
 import { format } from "date-fns";
 import {
   Table,
@@ -53,8 +54,8 @@ const ProjectDetail = () => {
   const [isCreateAgendaDialogOpen, setIsCreateAgendaDialogOpen] = useState(false);
   const [newAgendaTitle, setNewAgendaTitle] = useState("");
   const [newAgendaDescription, setNewAgendaDescription] = useState("");
-  const [availableCredits, setAvailableCredits] = useState(25); // Mock credits
-  const { user } = useAuth();
+  const [availableCredits, setAvailableCredits] = useState(0);
+  const { user, profile } = useAuth();
 
   useEffect(() => {
     if (!projectId) {
@@ -64,7 +65,27 @@ const ProjectDetail = () => {
 
     fetchProject(projectId);
     fetchAgendas(projectId);
-  }, [projectId]);
+    fetchUserCredits();
+  }, [projectId, user?.id]);
+
+  const fetchUserCredits = async () => {
+    try {
+      if (!user) return;
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('credits')
+        .eq('id', user.id)
+        .single();
+
+      if (error) throw error;
+      
+      // Set credits (default to 0 if not available)
+      setAvailableCredits(data?.credits || 0);
+    } catch (error: any) {
+      console.error("Error fetching user credits:", error.message);
+    }
+  };
 
   const fetchProject = async (projectId: string) => {
     try {
@@ -81,7 +102,8 @@ const ProjectDetail = () => {
       setProject(data);
     } catch (error: any) {
       console.error("Error fetching project:", error.message);
-      toast("Error", {
+      toast({
+        title: "Error",
         description: "Failed to load project", 
         variant: "destructive"
       });
@@ -103,7 +125,8 @@ const ProjectDetail = () => {
       setAgendas(data || []);
     } catch (error: any) {
       console.error("Error fetching agendas:", error.message);
-      toast("Error", {
+      toast({
+        title: "Error",
         description: "Failed to load agendas",
         variant: "destructive"
       });
@@ -111,6 +134,14 @@ const ProjectDetail = () => {
   };
 
   const handleCreateAgendaClick = () => {
+    if (availableCredits <= 0) {
+      toast({
+        title: "Insufficient Credits",
+        description: "You need at least 1 credit to create a new meeting. Please purchase more credits.",
+        variant: "destructive"
+      });
+      return;
+    }
     setIsCreateAgendaDialogOpen(true);
   };
 
@@ -123,7 +154,8 @@ const ProjectDetail = () => {
   const handleCreateAgenda = async () => {
     try {
       if (!newAgendaTitle || !newAgendaDescription) {
-        toast("Error", {
+        toast({
+          title: "Error",
           description: "Please fill in all fields",
           variant: "destructive"
         });
@@ -131,13 +163,35 @@ const ProjectDetail = () => {
       }
 
       if (!projectId) {
-        toast("Error", {
+        toast({
+          title: "Error",
           description: "Project ID is missing",
           variant: "destructive"
         });
         return;
       }
 
+      if (availableCredits <= 0) {
+        toast({
+          title: "Insufficient Credits",
+          description: "You need at least 1 credit to create a new meeting",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // First, deduct 1 credit from user's account
+      const { error: creditError } = await supabase
+        .from('profiles')
+        .update({ 
+          credits: availableCredits - 1,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user?.id);
+
+      if (creditError) throw creditError;
+
+      // Then create the agenda
       const { data, error } = await supabase
         .from('agendas')
         .insert([
@@ -148,7 +202,7 @@ const ProjectDetail = () => {
             status: 'draft'
           },
         ])
-        .select('*')
+        .select('*');
 
       if (error) {
         throw error;
@@ -156,13 +210,19 @@ const ProjectDetail = () => {
 
       setAgendas([...agendas, ...(data || [])]);
       handleCloseCreateAgendaDialog();
-      toast("Success", {
-        description: "Meeting created successfully!"
+      
+      // Update local credit count
+      setAvailableCredits(availableCredits - 1);
+      
+      toast({
+        title: "Success",
+        description: "Meeting created successfully! 1 credit has been deducted from your account."
       });
     } catch (error: any) {
       console.error("Error creating agenda:", error.message);
-      toast("Error", {
-        description: "Failed to create meeting",
+      toast({
+        title: "Error",
+        description: "Failed to create meeting: " + error.message,
         variant: "destructive"
       });
     }
@@ -231,13 +291,14 @@ const ProjectDetail = () => {
               className="border-amber-500 text-amber-700 hover:bg-amber-50"
               onClick={() => navigate('/checkout')}
             >
-              <CreditCard className="mr-2 h-4 w-4" />
+              <IndianRupee className="mr-2 h-4 w-4" />
               Buy Credits
             </Button>
             
             <Button
               className="bg-evoting-600 hover:bg-evoting-700 text-white"
               onClick={handleCreateAgendaClick}
+              disabled={availableCredits <= 0}
             >
               <Plus className="mr-2 h-4 w-4" />
               Create New Meeting
@@ -289,10 +350,23 @@ const ProjectDetail = () => {
               <Button 
                 className="bg-evoting-600 hover:bg-evoting-700 text-white"
                 onClick={handleCreateAgendaClick}
+                disabled={availableCredits <= 0}
               >
                 <Plus className="mr-2 h-4 w-4" />
                 Create New Meeting
               </Button>
+              {availableCredits <= 0 && (
+                <p className="text-red-500 mt-3">
+                  You need credits to create meetings. 
+                  <Button
+                    variant="link"
+                    className="text-evoting-600 p-0 h-auto"
+                    onClick={() => navigate('/checkout')}
+                  >
+                    Buy credits now
+                  </Button>
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -325,13 +399,24 @@ const ProjectDetail = () => {
                   onChange={(e) => setNewAgendaDescription(e.target.value)}
                 />
               </div>
+              
+              <div className="p-3 bg-amber-50 border border-amber-100 rounded-md">
+                <p className="text-sm text-amber-800">
+                  <strong>Note:</strong> Creating this meeting will use 1 credit from your account.
+                  You currently have {availableCredits} credits available.
+                </p>
+              </div>
             </div>
             
             <div className="mt-6 flex justify-end gap-4">
               <Button variant="ghost" onClick={handleCloseCreateAgendaDialog}>
                 Cancel
               </Button>
-              <Button className="bg-evoting-600 hover:bg-evoting-700 text-white" onClick={handleCreateAgenda}>
+              <Button 
+                className="bg-evoting-600 hover:bg-evoting-700 text-white" 
+                onClick={handleCreateAgenda}
+                disabled={availableCredits <= 0}
+              >
                 Create
               </Button>
             </div>

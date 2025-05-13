@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import Navigation from "@/components/layout/Navigation";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Search, User, FileText, CheckSquare, CreditCard, Plus } from "lucide-react";
+import { Search, User, FileText, CheckSquare, IndianRupee, Plus, Trash2, Edit } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import {
   Table,
@@ -24,7 +24,16 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 
 interface Stats {
   totalUsers: number;
@@ -52,6 +61,7 @@ interface SubscriptionPlan {
 }
 
 const AdminDashboard = () => {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [users, setUsers] = useState<User[]>([]);
   const [stats, setStats] = useState<Stats>({
@@ -62,9 +72,9 @@ const AdminDashboard = () => {
     liveMeetings: 0,
   });
   const [plans, setPlans] = useState<SubscriptionPlan[]>([
-    { id: "1", name: "Basic Plan", description: "10 credits", price: 49, credits: 10 },
-    { id: "2", name: "Standard Plan", description: "50 credits", price: 149, credits: 50 },
-    { id: "3", name: "Premium Plan", description: "100 credits", price: 249, credits: 100 },
+    { id: "1", name: "Basic Plan", description: "10 credits", price: 2999, credits: 10 },
+    { id: "2", name: "Standard Plan", description: "50 credits", price: 7999, credits: 50 },
+    { id: "3", name: "Premium Plan", description: "100 credits", price: 14999, credits: 100 },
   ]);
   const [newPlan, setNewPlan] = useState({
     name: "",
@@ -73,6 +83,9 @@ const AdminDashboard = () => {
     credits: 0,
   });
   const [isAddingPlan, setIsAddingPlan] = useState(false);
+  const [isEditingPlan, setIsEditingPlan] = useState(false);
+  const [isDeletingPlan, setIsDeletingPlan] = useState(false);
+  const [currentPlan, setCurrentPlan] = useState<SubscriptionPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const { isSuper } = useAuth();
 
@@ -91,13 +104,7 @@ const AdminDashboard = () => {
 
       if (userError) throw userError;
       
-      // Add dummy credit values for now
-      const usersWithCredits = userData.map(user => ({
-        ...user,
-        credits: Math.floor(Math.random() * 100) // Random credits for demonstration
-      }));
-      
-      setUsers(usersWithCredits);
+      setUsers(userData || []);
       
       // Fetch projects stats
       const { data: projectsData, error: projectsError } = await supabase
@@ -152,6 +159,44 @@ const AdminDashboard = () => {
     toast({
       title: "Success",
       description: "Subscription plan added successfully"
+    });
+  };
+
+  const handleEditPlan = (plan: SubscriptionPlan) => {
+    setCurrentPlan(plan);
+    setIsEditingPlan(true);
+  };
+
+  const handleDeletePlan = (plan: SubscriptionPlan) => {
+    setCurrentPlan(plan);
+    setIsDeletingPlan(true);
+  };
+
+  const handleUpdatePlan = () => {
+    if (!currentPlan) return;
+    
+    const updatedPlans = plans.map(p => 
+      p.id === currentPlan.id ? currentPlan : p
+    );
+    
+    setPlans(updatedPlans);
+    setIsEditingPlan(false);
+    toast({
+      title: "Success",
+      description: "Plan updated successfully"
+    });
+  };
+
+  const handleConfirmDelete = () => {
+    if (!currentPlan) return;
+    
+    const filteredPlans = plans.filter(p => p.id !== currentPlan.id);
+    setPlans(filteredPlans);
+    setIsDeletingPlan(false);
+    
+    toast({
+      title: "Success",
+      description: "Plan deleted successfully"
     });
   };
 
@@ -290,13 +335,34 @@ const AdminDashboard = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {plans.map((plan) => (
               <Card key={plan.id} className="border-2 hover:border-evoting-600 transition-all">
-                <CardHeader>
+                <CardHeader className="relative">
                   <CardTitle>{plan.name}</CardTitle>
+                  <div className="absolute top-2 right-2 flex space-x-1">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 text-gray-500"
+                      onClick={() => handleEditPlan(plan)}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 text-gray-500"
+                      onClick={() => handleDeletePlan(plan)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <p className="text-gray-600 mb-4">{plan.description}</p>
                   <div className="flex justify-between items-center">
-                    <span className="text-3xl font-bold">${plan.price}</span>
+                    <div className="flex items-baseline">
+                      <IndianRupee className="h-4 w-4 mr-1" />
+                      <span className="text-3xl font-bold">{(plan.price / 100).toLocaleString('en-IN')}</span>
+                    </div>
                     <span className="bg-evoting-50 text-evoting-700 px-3 py-1 rounded-full text-sm font-medium">
                       {plan.credits} credits
                     </span>
@@ -306,52 +372,136 @@ const AdminDashboard = () => {
             ))}
           </div>
           
+          {/* Add Plan Dialog */}
           {isAddingPlan && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-              <div className="bg-white p-6 rounded-lg max-w-md w-full">
-                <h3 className="text-xl font-bold mb-4">Add New Subscription Plan</h3>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Plan Name</label>
+            <Dialog open={isAddingPlan} onOpenChange={setIsAddingPlan}>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Add New Subscription Plan</DialogTitle>
+                  <DialogDescription>
+                    Create a new subscription plan for your customers
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="plan-name">Plan Name</Label>
                     <Input 
+                      id="plan-name"
                       value={newPlan.name} 
                       onChange={(e) => setNewPlan({...newPlan, name: e.target.value})}
                       placeholder="e.g. Premium Plan"
                     />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Description</label>
+                  <div className="space-y-2">
+                    <Label htmlFor="plan-description">Description</Label>
                     <Input 
+                      id="plan-description"
                       value={newPlan.description} 
                       onChange={(e) => setNewPlan({...newPlan, description: e.target.value})}
                       placeholder="e.g. 100 credits"
                     />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Price ($)</label>
+                  <div className="space-y-2">
+                    <Label htmlFor="plan-price">Price (₹)</Label>
                     <Input 
+                      id="plan-price"
                       type="number" 
-                      value={newPlan.price} 
-                      onChange={(e) => setNewPlan({...newPlan, price: parseFloat(e.target.value)})}
-                      placeholder="e.g. 99.99"
+                      value={newPlan.price / 100} 
+                      onChange={(e) => setNewPlan({...newPlan, price: Math.round(parseFloat(e.target.value) * 100)})}
+                      placeholder="e.g. 999.99"
                     />
+                    <p className="text-xs text-gray-500">Enter the price in INR (Indian Rupees)</p>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Credits</label>
+                  <div className="space-y-2">
+                    <Label htmlFor="plan-credits">Credits</Label>
                     <Input 
+                      id="plan-credits"
                       type="number" 
                       value={newPlan.credits} 
                       onChange={(e) => setNewPlan({...newPlan, credits: parseInt(e.target.value)})}
                       placeholder="e.g. 100"
                     />
                   </div>
-                  <div className="flex justify-end gap-2 pt-4">
-                    <Button variant="outline" onClick={() => setIsAddingPlan(false)}>Cancel</Button>
-                    <Button className="bg-evoting-600 hover:bg-evoting-700" onClick={handleAddPlan}>Save Plan</Button>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsAddingPlan(false)}>Cancel</Button>
+                  <Button className="bg-evoting-600 hover:bg-evoting-700" onClick={handleAddPlan}>Save Plan</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
+          
+          {/* Edit Plan Dialog */}
+          {isEditingPlan && currentPlan && (
+            <Dialog open={isEditingPlan} onOpenChange={setIsEditingPlan}>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Edit Subscription Plan</DialogTitle>
+                  <DialogDescription>
+                    Update the details of this subscription plan
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-plan-name">Plan Name</Label>
+                    <Input 
+                      id="edit-plan-name"
+                      value={currentPlan.name} 
+                      onChange={(e) => setCurrentPlan({...currentPlan, name: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-plan-description">Description</Label>
+                    <Input 
+                      id="edit-plan-description"
+                      value={currentPlan.description} 
+                      onChange={(e) => setCurrentPlan({...currentPlan, description: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-plan-price">Price (₹)</Label>
+                    <Input 
+                      id="edit-plan-price"
+                      type="number" 
+                      value={currentPlan.price / 100} 
+                      onChange={(e) => setCurrentPlan({...currentPlan, price: Math.round(parseFloat(e.target.value) * 100)})}
+                    />
+                    <p className="text-xs text-gray-500">Enter the price in INR (Indian Rupees)</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-plan-credits">Credits</Label>
+                    <Input 
+                      id="edit-plan-credits"
+                      type="number" 
+                      value={currentPlan.credits} 
+                      onChange={(e) => setCurrentPlan({...currentPlan, credits: parseInt(e.target.value)})}
+                    />
                   </div>
                 </div>
-              </div>
-            </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsEditingPlan(false)}>Cancel</Button>
+                  <Button onClick={handleUpdatePlan}>Update Plan</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
+          
+          {/* Delete Plan Dialog */}
+          {isDeletingPlan && currentPlan && (
+            <Dialog open={isDeletingPlan} onOpenChange={setIsDeletingPlan}>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Delete Plan</DialogTitle>
+                  <DialogDescription>
+                    Are you sure you want to delete the {currentPlan.name} plan? This action cannot be undone.
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter className="mt-4">
+                  <Button variant="outline" onClick={() => setIsDeletingPlan(false)}>Cancel</Button>
+                  <Button variant="destructive" onClick={handleConfirmDelete}>Delete</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           )}
         </div>
         
@@ -383,7 +533,7 @@ const AdminDashboard = () => {
                     <TableHead className="hidden md:table-cell">Company</TableHead>
                     <TableHead className="hidden md:table-cell">Joined</TableHead>
                     <TableHead>Credits</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead>Add Credits</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -395,12 +545,20 @@ const AdminDashboard = () => {
                       <TableCell className="hidden md:table-cell">{formatDate(user.created_at)}</TableCell>
                       <TableCell>
                         <span className="inline-flex items-center">
-                          <CreditCard className="mr-1 h-4 w-4 text-gray-400" />
-                          {user.credits}
+                          <IndianRupee className="mr-1 h-4 w-4 text-gray-400" />
+                          {user.credits || 0}
                         </span>
                       </TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="outline" size="sm">View</Button>
+                      <TableCell>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => navigate('/super-admin')}
+                          className="text-evoting-600 hover:bg-evoting-50"
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          Add
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}

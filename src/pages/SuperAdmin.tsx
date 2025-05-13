@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
+import { Search, Plus, IndianRupee } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -26,6 +26,15 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { Link } from "react-router-dom";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 
 type Profile = {
   id: string;
@@ -33,14 +42,19 @@ type Profile = {
   email: string;
   company_name: string | null;
   role: "super_admin" | "admin" | "voter";
+  credits: number;
   created_at: string;
   updated_at: string;
+  meeting_count?: number;
 };
 
 const SuperAdmin = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [users, setUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAddCreditsDialogOpen, setIsAddCreditsDialogOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
+  const [creditsToAdd, setCreditsToAdd] = useState<number>(0);
   const { isSuper } = useAuth();
   
   useEffect(() => {
@@ -50,15 +64,41 @@ const SuperAdmin = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      
+      // Fetch profiles
+      const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
         .select('*');
 
-      if (error) {
-        throw error;
-      }
+      if (profilesError) throw profilesError;
+      
+      // Fetch all meetings to count per admin
+      const { data: agendasData, error: agendasError } = await supabase
+        .from('agendas')
+        .select('id, project_id');
+        
+      if (agendasError) throw agendasError;
+      
+      // Fetch all projects to link them to admins
+      const { data: projectsData, error: projectsError } = await supabase
+        .from('projects')
+        .select('id, admin_id');
+        
+      if (projectsError) throw projectsError;
+      
+      // Calculate meeting count for each admin
+      const usersWithMeetingCount = profilesData.map(user => {
+        const userProjects = projectsData.filter(project => project.admin_id === user.id).map(p => p.id);
+        const meetingCount = agendasData.filter(agenda => userProjects.includes(agenda.project_id)).length;
+        
+        return {
+          ...user,
+          meeting_count: meetingCount,
+          credits: user.credits || 0 // Ensure credits exist
+        };
+      });
 
-      setUsers(data || []);
+      setUsers(usersWithMeetingCount || []);
     } catch (error: any) {
       console.error("Error fetching users:", error.message);
       toast({
@@ -67,6 +107,61 @@ const SuperAdmin = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const openAddCreditsDialog = (user: Profile) => {
+    setSelectedUser(user);
+    setCreditsToAdd(0);
+    setIsAddCreditsDialogOpen(true);
+  };
+
+  const handleAddCredits = async () => {
+    if (!selectedUser || creditsToAdd <= 0) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid number of credits to add",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      // Calculate new credit total
+      const newCreditTotal = (selectedUser.credits || 0) + creditsToAdd;
+      
+      // Update user credits in the database
+      const { error } = await supabase
+        .from('profiles')
+        .update({ 
+          credits: newCreditTotal,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', selectedUser.id);
+
+      if (error) throw error;
+      
+      // Update local state
+      setUsers(prevUsers => 
+        prevUsers.map(user => 
+          user.id === selectedUser.id 
+            ? { ...user, credits: newCreditTotal } 
+            : user
+        )
+      );
+      
+      setIsAddCreditsDialogOpen(false);
+      toast({
+        title: "Success",
+        description: `${creditsToAdd} credits added to ${selectedUser.name}'s account`
+      });
+    } catch (error: any) {
+      console.error("Error adding credits:", error.message);
+      toast({
+        title: "Error",
+        description: `Failed to add credits: ${error.message}`,
+        variant: "destructive"
+      });
     }
   };
 
@@ -176,7 +271,9 @@ const SuperAdmin = () => {
                   <TableHead className="hidden md:table-cell">Company</TableHead>
                   <TableHead className="hidden md:table-cell">Joined</TableHead>
                   <TableHead>Role</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead>Credits</TableHead>
+                  <TableHead>Meetings</TableHead>
+                  <TableHead className="text-right">Add Credits</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -187,8 +284,18 @@ const SuperAdmin = () => {
                     <TableCell className="hidden md:table-cell">{user.company_name || '-'}</TableCell>
                     <TableCell className="hidden md:table-cell">{formatDate(user.created_at)}</TableCell>
                     <TableCell>{getStatusBadge(user.role)}</TableCell>
+                    <TableCell className="font-medium">{user.credits || 0}</TableCell>
+                    <TableCell>{user.meeting_count || 0}</TableCell>
                     <TableCell className="text-right">
-                      <Button variant="outline" size="sm">View</Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => openAddCreditsDialog(user)}
+                        className="text-evoting-600 hover:text-evoting-700"
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -203,6 +310,57 @@ const SuperAdmin = () => {
           </div>
         )}
       </div>
+      
+      {/* Add Credits Dialog */}
+      {isAddCreditsDialogOpen && selectedUser && (
+        <Dialog open={isAddCreditsDialogOpen} onOpenChange={setIsAddCreditsDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Add Credits</DialogTitle>
+              <DialogDescription>
+                Add credits to {selectedUser.name}'s account ({selectedUser.email})
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="py-6">
+              <div className="flex justify-between items-center mb-4">
+                <Label htmlFor="current-credits">Current Credits:</Label>
+                <span className="font-semibold">{selectedUser.credits || 0}</span>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="add-credits">Credits to Add</Label>
+                <div className="flex items-center">
+                  <IndianRupee className="h-4 w-4 mr-2 text-gray-500" />
+                  <Input
+                    id="add-credits"
+                    type="number"
+                    value={creditsToAdd}
+                    onChange={(e) => setCreditsToAdd(Math.max(0, parseInt(e.target.value) || 0))}
+                    className="flex-1"
+                    min="1"
+                  />
+                </div>
+              </div>
+              
+              <div className="mt-4 p-3 bg-gray-50 rounded-md">
+                <p className="text-sm text-gray-600">
+                  New Balance: <span className="font-semibold">{(selectedUser.credits || 0) + creditsToAdd}</span> credits
+                </p>
+              </div>
+            </div>
+            
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsAddCreditsDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleAddCredits} disabled={creditsToAdd <= 0}>
+                Add Credits
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 };
