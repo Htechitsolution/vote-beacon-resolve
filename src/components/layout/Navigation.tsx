@@ -83,7 +83,18 @@ const Navigation = () => {
                   </Link>
                 </Button>
               )}
-             
+              <Button 
+                variant="outline"
+                onClick={() => navigate('/checkout')}
+                className="flex items-center gap-2 border-amber-500 text-amber-700 hover:bg-amber-50"
+              >
+                <IndianRupee className="mr-1 h-4 w-4" />
+                Buy Credits
+              </Button>
+              <Button variant="outline" onClick={handleLogout} className="flex items-center gap-2">
+                <LogOut className="mr-1 h-4 w-4" />
+                Logout
+              </Button>
             </>
           ) : (
             <>
@@ -138,7 +149,17 @@ const Navigation = () => {
                     </Link>
                   </Button>
                 )}
-               
+                <Button
+                  variant="ghost"
+                  className="justify-start"
+                  onClick={() => {
+                    navigate('/checkout');
+                    setIsOpen(false);
+                  }}
+                >
+                  <IndianRupee className="mr-2 h-4 w-4" />
+                  Buy Credits
+                </Button>
                 <Button
                   variant="outline"
                   className="justify-start"

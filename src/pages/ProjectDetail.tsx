@@ -278,14 +278,7 @@ const ProjectDetail = () => {
               </CardContent>
             </Card>
             
-            <Button
-              variant="outline"
-              className="border-amber-500 text-amber-700 hover:bg-amber-50"
-              onClick={() => navigate('/checkout')}
-            >
-              <IndianRupee className="mr-2 h-4 w-4" />
-              Buy Credits
-            </Button>
+          
             
             <Button
               className="bg-evoting-600 hover:bg-evoting-700 text-white"
