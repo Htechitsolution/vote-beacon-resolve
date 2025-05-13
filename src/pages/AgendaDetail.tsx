@@ -5,7 +5,19 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileText, ArrowLeft, Users, Vote, Check, Clock, ChartBar, X } from "lucide-react";
+import { 
+  FileText, 
+  ArrowLeft, 
+  Users, 
+  Vote, 
+  Check, 
+  Clock, 
+  ChartBar, 
+  X, 
+  Calendar,
+  Upload,
+  AlertTriangle
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -25,6 +37,24 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { format } from "date-fns";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogClose
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 
 type Agenda = {
   id: string;
@@ -73,6 +103,16 @@ const AgendaDetail = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("details");
   const [isAdmin, setIsAdmin] = useState(false);
+
+  // New state variables for adding options and confirmation dialogs
+  const [isAddOptionDialogOpen, setIsAddOptionDialogOpen] = useState(false);
+  const [newOptionTitle, setNewOptionTitle] = useState("");
+  const [newOptionDescription, setNewOptionDescription] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isStartVotingDialogOpen, setIsStartVotingDialogOpen] = useState(false);
+  const [isExtendEndDateDialogOpen, setIsExtendEndDateDialogOpen] = useState(false);
+  const [selectedEndDate, setSelectedEndDate] = useState<Date | null>(null);
 
   useEffect(() => {
     if (projectId && agendaId) {
@@ -159,20 +199,61 @@ const AgendaDetail = () => {
     }
   };
 
-  const handleStartVoting = async () => {
+  const handleStartVoting = () => {
+    setIsStartVotingDialogOpen(true);
+  };
+
+  const confirmStartVoting = async () => {
     try {
+      if (!selectedEndDate) {
+        toast.error("Please select an end date");
+        return;
+      }
+      
       const { error } = await supabase
         .from('agendas')
-        .update({ status: 'live', start_date: new Date().toISOString() })
+        .update({ 
+          status: 'live', 
+          start_date: new Date().toISOString(),
+          end_date: selectedEndDate.toISOString()
+        })
         .eq('id', agendaId);
         
       if (error) throw error;
       
       toast.success("Voting has been started");
+      setIsStartVotingDialogOpen(false);
       fetchData(); // Refresh data
     } catch (error: any) {
       console.error("Error starting voting:", error.message);
       toast.error("Failed to start voting");
+    }
+  };
+
+  const handleExtendEndDate = () => {
+    setIsExtendEndDateDialogOpen(true);
+  };
+
+  const confirmExtendEndDate = async () => {
+    try {
+      if (!selectedEndDate) {
+        toast.error("Please select a new end date");
+        return;
+      }
+      
+      const { error } = await supabase
+        .from('agendas')
+        .update({ end_date: selectedEndDate.toISOString() })
+        .eq('id', agendaId);
+        
+      if (error) throw error;
+      
+      toast.success("End date has been extended");
+      setIsExtendEndDateDialogOpen(false);
+      fetchData(); // Refresh data
+    } catch (error: any) {
+      console.error("Error extending end date:", error.message);
+      toast.error("Failed to extend end date");
     }
   };
 
@@ -190,6 +271,102 @@ const AgendaDetail = () => {
     } catch (error: any) {
       console.error("Error closing voting:", error.message);
       toast.error("Failed to close voting");
+    }
+  };
+
+  const handleAddOption = () => {
+    setIsAddOptionDialogOpen(true);
+    setNewOptionTitle("");
+    setNewOptionDescription("");
+    setSelectedFile(null);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const file = e.target.files[0];
+      
+      // Check file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error("File size cannot exceed 5MB");
+        return;
+      }
+      
+      // Check file type
+      const allowedTypes = [
+        'application/pdf', 
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/vnd.ms-powerpoint',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'application/zip'
+      ];
+      
+      if (!allowedTypes.includes(file.type)) {
+        toast.error("Only PDF, Word, Excel, PowerPoint, or ZIP files are allowed");
+        return;
+      }
+      
+      setSelectedFile(file);
+    }
+  };
+
+  const handleSubmitOption = async () => {
+    try {
+      setIsUploading(true);
+      
+      if (!newOptionTitle) {
+        toast.error("Option title is required");
+        setIsUploading(false);
+        return;
+      }
+      
+      let filePath = null;
+      let fileName = null;
+      
+      // Upload file if selected
+      if (selectedFile) {
+        const fileExt = selectedFile.name.split('.').pop();
+        const fileKey = `${Date.now()}_${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+        const storagePath = `options/${fileKey}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('voting-documents')
+          .upload(storagePath, selectedFile);
+        
+        if (uploadError) throw uploadError;
+        
+        filePath = storagePath;
+        fileName = selectedFile.name;
+      }
+      
+      // Insert new option
+      const { data, error } = await supabase
+        .from('options')
+        .insert([
+          {
+            title: newOptionTitle,
+            description: newOptionDescription,
+            agenda_id: agendaId,
+            file_path: filePath,
+            file_name: fileName
+          }
+        ])
+        .select();
+      
+      if (error) throw error;
+      
+      // Update options state
+      setOptions([...options, ...(data || [])]);
+      
+      setIsAddOptionDialogOpen(false);
+      toast.success("Option added successfully");
+    } catch (error: any) {
+      console.error("Error adding option:", error.message);
+      toast.error("Failed to add option");
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -214,6 +391,29 @@ const AgendaDetail = () => {
     }
   };
 
+  // Auto-close voting when end date is reached
+  useEffect(() => {
+    if (agenda?.status === 'live' && agenda?.end_date) {
+      const endDate = new Date(agenda.end_date);
+      const now = new Date();
+      
+      if (now > endDate) {
+        handleCloseVoting();
+      } else {
+        // Set timeout to close voting automatically
+        const timeUntilClose = endDate.getTime() - now.getTime();
+        if (timeUntilClose < 2147483647) { // Max setTimeout value (~24.8 days)
+          const timer = setTimeout(() => {
+            handleCloseVoting();
+          }, timeUntilClose);
+          
+          // Clean up timer
+          return () => clearTimeout(timer);
+        }
+      }
+    }
+  }, [agenda]);
+
   if (loading) {
     return (
       <div>
@@ -235,7 +435,7 @@ const AgendaDetail = () => {
           <h1 className="text-2xl font-bold text-red-600">Agenda Not Found</h1>
           <p className="mt-2">The agenda you're looking for doesn't exist or you don't have permission to view it.</p>
           <Button className="mt-4" asChild>
-            <Link to={`/projects/${projectId}`}>Back to Project</Link>
+            <Link to={`/projects/${projectId}`}>Back to Meeting</Link>
           </Button>
         </div>
       </div>
@@ -283,13 +483,24 @@ const AgendaDetail = () => {
                 )}
                 
                 {isAdmin && agenda.status === 'live' && (
-                  <Button 
-                    onClick={handleCloseVoting}
-                    variant="destructive"
-                  >
-                    <X className="mr-2 h-4 w-4" />
-                    Close Meeting
-                  </Button>
+                  <>
+                    <Button 
+                      onClick={handleExtendEndDate}
+                      variant="outline"
+                      className="flex items-center gap-2"
+                    >
+                      <Calendar className="h-4 w-4" />
+                      Extend End Date
+                    </Button>
+                    
+                    <Button 
+                      onClick={handleCloseVoting}
+                      variant="destructive"
+                    >
+                      <X className="mr-2 h-4 w-4" />
+                      Close Meeting
+                    </Button>
+                  </>
                 )}
                 
                 <Button 
@@ -313,18 +524,9 @@ const AgendaDetail = () => {
               <Button variant="outline" asChild>
                 <Link to={`/projects/${projectId}`}>
                   <ArrowLeft className="mr-2 h-4 w-4" />
-                  Back to Project
+                  Back to Meeting
                 </Link>
               </Button>
-              
-              {isAdmin && agenda.status !== 'closed' && (
-                <Button variant="outline" asChild>
-                  <Link to={`/projects/${projectId}/agenda/${agendaId}/voters`}>
-                    <Users className="mr-2 h-4 w-4" />
-                    Manage Voters
-                  </Link>
-                </Button>
-              )}
             </div>
           </div>
         </div>
@@ -333,7 +535,7 @@ const AgendaDetail = () => {
           <TabsList className="mb-4">
             <TabsTrigger value="details">Details</TabsTrigger>
             <TabsTrigger value="options">Voting Options</TabsTrigger>
-            <TabsTrigger value="voters">Registered Voters</TabsTrigger>
+            <TabsTrigger value="voters">Voting Status</TabsTrigger>
           </TabsList>
           
           <TabsContent value="details">
@@ -351,18 +553,18 @@ const AgendaDetail = () => {
                     <h3 className="text-sm font-medium text-gray-500">Voting Type</h3>
                     <p className="mt-1 capitalize">{agenda.voting_type || "Standard"}</p>
                   </div>
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500">Start Date</h3>
-                    <p className="mt-1">{formatDate(agenda.start_date)}</p>
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500">End Date</h3>
-                    <p className="mt-1">{formatDate(agenda.end_date)}</p>
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500">Created</h3>
-                    <p className="mt-1">{formatDate(agenda.created_at)}</p>
-                  </div>
+                  {agenda.status !== 'draft' && (
+                    <>
+                      <div>
+                        <h3 className="text-sm font-medium text-gray-500">Start Date</h3>
+                        <p className="mt-1">{formatDate(agenda.start_date)}</p>
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-medium text-gray-500">End Date</h3>
+                        <p className="mt-1">{formatDate(agenda.end_date)}</p>
+                      </div>
+                    </>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -370,8 +572,14 @@ const AgendaDetail = () => {
           
           <TabsContent value="options">
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Voting Options</CardTitle>
+                {isAdmin && agenda.status === 'draft' && (
+                  <Button onClick={handleAddOption} className="bg-evoting-600 hover:bg-evoting-700 text-white">
+                    <Upload className="mr-2 h-4 w-4" />
+                    Add Option
+                  </Button>
+                )}
               </CardHeader>
               <CardContent>
                 {options.length === 0 ? (
@@ -421,23 +629,12 @@ const AgendaDetail = () => {
           <TabsContent value="voters">
             <Card>
               <CardHeader>
-                <CardTitle>Registered Voters</CardTitle>
+                <CardTitle>Voting Status</CardTitle>
               </CardHeader>
               <CardContent>
                 {voters.length === 0 ? (
                   <div className="text-center py-4">
                     <p className="text-gray-500">No voters have been registered yet.</p>
-                    {isAdmin && agenda.status !== 'closed' && (
-                      <Button 
-                        className="mt-4 bg-evoting-600 hover:bg-evoting-700 text-white"
-                        asChild
-                      >
-                        <Link to={`/projects/${projectId}/agenda/${agendaId}/voters`}>
-                          <Users className="mr-2 h-4 w-4" />
-                          Manage Voters
-                        </Link>
-                      </Button>
-                    )}
                   </div>
                 ) : (
                   <div className="border rounded-md">
@@ -470,6 +667,177 @@ const AgendaDetail = () => {
           </TabsContent>
         </Tabs>
       </div>
+      
+      {/* Add Option Dialog */}
+      <Dialog open={isAddOptionDialogOpen} onOpenChange={setIsAddOptionDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Voting Option</DialogTitle>
+            <DialogDescription>
+              Create a new voting option with title, description and optional document.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="title">Title</Label>
+              <Input 
+                id="title" 
+                placeholder="Enter option title"
+                value={newOptionTitle}
+                onChange={(e) => setNewOptionTitle(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="description">Resolution</Label>
+              <Textarea 
+                id="description" 
+                placeholder="Enter resolution text"
+                value={newOptionDescription}
+                onChange={(e) => setNewOptionDescription(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="file">Document (Optional - max 5MB)</Label>
+              <div className="flex items-center gap-2">
+                <Input 
+                  id="file" 
+                  type="file" 
+                  onChange={handleFileChange}
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip"
+                />
+              </div>
+              <p className="text-xs text-gray-500">
+                Accepted formats: PDF, Word, Excel, PowerPoint, ZIP (Max 5MB)
+              </p>
+            </div>
+          </div>
+          <DialogFooter className="flex gap-2 sm:justify-end">
+            <DialogClose asChild>
+              <Button type="button" variant="outline">
+                Cancel
+              </Button>
+            </DialogClose>
+            <Button 
+              type="submit" 
+              onClick={handleSubmitOption} 
+              disabled={isUploading || !newOptionTitle}
+              className="bg-evoting-600 hover:bg-evoting-700 text-white"
+            >
+              {isUploading ? "Uploading..." : "Add Option"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Start Voting Confirmation Dialog */}
+      <Dialog open={isStartVotingDialogOpen} onOpenChange={setIsStartVotingDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Start Voting</DialogTitle>
+            <DialogDescription>
+              Please select when voting should end. Voting will start immediately.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col space-y-4 py-4">
+            <div className="flex flex-col space-y-2">
+              <Label htmlFor="endDate">End Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={`justify-start text-left font-normal ${!selectedEndDate ? "text-muted-foreground" : ""}`}
+                  >
+                    <Calendar className="mr-2 h-4 w-4" />
+                    {selectedEndDate ? format(selectedEndDate, "PPP") : "Select end date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <CalendarComponent
+                    mode="single"
+                    selected={selectedEndDate}
+                    onSelect={setSelectedEndDate}
+                    initialFocus
+                    disabled={(date) => date < new Date()}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="bg-amber-50 border border-amber-200 rounded-md p-3 flex items-start gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-amber-700">
+                Once voting starts, you will not be able to add more options. Voting will automatically close on the selected end date.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
+            <Button 
+              onClick={confirmStartVoting}
+              className="bg-evoting-600 hover:bg-evoting-700 text-white"
+              disabled={!selectedEndDate}
+            >
+              Start Voting
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Extend End Date Dialog */}
+      <Dialog open={isExtendEndDateDialogOpen} onOpenChange={setIsExtendEndDateDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Extend End Date</DialogTitle>
+            <DialogDescription>
+              Select a new end date for the voting period.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col space-y-4 py-4">
+            <div className="flex flex-col space-y-2">
+              <Label>Current End Date</Label>
+              <div className="text-sm">
+                {agenda?.end_date ? format(new Date(agenda.end_date), "PPP p") : "Not set"}
+              </div>
+            </div>
+            <div className="flex flex-col space-y-2">
+              <Label htmlFor="newEndDate">New End Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={`justify-start text-left font-normal ${!selectedEndDate ? "text-muted-foreground" : ""}`}
+                  >
+                    <Calendar className="mr-2 h-4 w-4" />
+                    {selectedEndDate ? format(selectedEndDate, "PPP") : "Select new end date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <CalendarComponent
+                    mode="single"
+                    selected={selectedEndDate}
+                    onSelect={setSelectedEndDate}
+                    initialFocus
+                    disabled={(date) => date < new Date()}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
+            <Button 
+              onClick={confirmExtendEndDate}
+              className="bg-evoting-600 hover:bg-evoting-700 text-white"
+              disabled={!selectedEndDate}
+            >
+              Extend End Date
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
