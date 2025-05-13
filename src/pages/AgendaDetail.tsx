@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -932,3 +933,80 @@ const AgendaDetail = () => {
             <div className="bg-amber-50 border border-amber-200 rounded-md p-3 flex items-start gap-2">
               <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
               <p className="text-sm text-amber-700">
+                Once voting has started, agenda items cannot be modified or deleted. 
+                Voters will be notified and can start voting immediately.
+              </p>
+            </div>
+          </div>
+          <DialogFooter className="flex gap-2 sm:justify-end">
+            <DialogClose asChild>
+              <Button type="button" variant="outline">
+                Cancel
+              </Button>
+            </DialogClose>
+            <Button 
+              onClick={confirmStartVoting} 
+              disabled={!selectedEndDate}
+              className="bg-evoting-600 hover:bg-evoting-700 text-white"
+            >
+              Start Voting Now
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Extend End Date Dialog */}
+      <Dialog open={isExtendEndDateDialogOpen} onOpenChange={setIsExtendEndDateDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Extend End Date</DialogTitle>
+            <DialogDescription>
+              Please select a new end date for the voting period.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col space-y-4 py-4">
+            <div className="flex flex-col space-y-2">
+              <Label htmlFor="endDate">New End Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={`justify-start text-left font-normal ${!selectedEndDate ? "text-muted-foreground" : ""}`}
+                  >
+                    <Calendar className="mr-2 h-4 w-4" />
+                    {selectedEndDate ? format(selectedEndDate, "PPP") : "Select new end date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <CalendarComponent
+                    mode="single"
+                    selected={selectedEndDate}
+                    onSelect={setSelectedEndDate}
+                    initialFocus
+                    disabled={(date) => date < new Date()}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+          <DialogFooter className="flex gap-2 sm:justify-end">
+            <DialogClose asChild>
+              <Button type="button" variant="outline">
+                Cancel
+              </Button>
+            </DialogClose>
+            <Button 
+              onClick={confirmExtendEndDate} 
+              disabled={!selectedEndDate}
+              className="bg-evoting-600 hover:bg-evoting-700 text-white"
+            >
+              Extend End Date
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
+export default AgendaDetail;
