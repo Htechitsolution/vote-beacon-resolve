@@ -40,9 +40,7 @@ const Navigation = () => {
     }
   };
   
-  const navLinks: NavLink[] = [
-   
-  ];
+  const navLinks: NavLink[] = [];
 
   // Add Admin Dashboard link for super admins
   if (profile?.role === "super_admin") {
