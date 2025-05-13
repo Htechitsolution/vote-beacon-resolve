@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -5,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, Users } from "lucide-react";
+import { Plus, Calendar } from "lucide-react";
 import { format } from "date-fns";
 import {
   Table,
@@ -27,6 +28,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import { Badge } from "@/components/ui/badge";
 
 interface Project {
   id: string;
@@ -40,9 +42,8 @@ interface Agenda {
   created_at: string;
   title: string;
   description: string;
-  start_date: string;
-  end_date: string;
   project_id: string;
+  status: string;
 }
 
 const ProjectDetail = () => {
@@ -53,8 +54,6 @@ const ProjectDetail = () => {
   const [isCreateAgendaDialogOpen, setIsCreateAgendaDialogOpen] = useState(false);
   const [newAgendaTitle, setNewAgendaTitle] = useState("");
   const [newAgendaDescription, setNewAgendaDescription] = useState("");
-  const [newAgendaStartDate, setNewAgendaStartDate] = useState("");
-  const [newAgendaEndDate, setNewAgendaEndDate] = useState("");
   const { user } = useAuth();
 
   useEffect(() => {
@@ -113,13 +112,11 @@ const ProjectDetail = () => {
     setIsCreateAgendaDialogOpen(false);
     setNewAgendaTitle("");
     setNewAgendaDescription("");
-    setNewAgendaStartDate("");
-    setNewAgendaEndDate("");
   };
 
   const handleCreateAgenda = async () => {
     try {
-      if (!newAgendaTitle || !newAgendaDescription || !newAgendaStartDate || !newAgendaEndDate) {
+      if (!newAgendaTitle || !newAgendaDescription) {
         toast.error("Please fill in all fields");
         return;
       }
@@ -135,10 +132,8 @@ const ProjectDetail = () => {
           {
             title: newAgendaTitle,
             description: newAgendaDescription,
-            start_date: newAgendaStartDate,
-            end_date: newAgendaEndDate,
             project_id: projectId,
-            created_by: user?.id,
+            status: 'draft'
           },
         ])
         .select('*')
@@ -149,18 +144,29 @@ const ProjectDetail = () => {
 
       setAgendas([...agendas, ...(data || [])]);
       handleCloseCreateAgendaDialog();
-      toast.success("Agenda created successfully!");
+      toast.success("Meeting created successfully!");
     } catch (error: any) {
       console.error("Error creating agenda:", error.message);
-      toast.error("Failed to create agenda");
+      toast.error("Failed to create meeting");
     }
   };
 
   const formatDate = (dateString: string) => {
     try {
-      return format(new Date(dateString), 'yyyy-MM-dd');
+      return format(new Date(dateString), 'dd MMM yyyy');
     } catch (error) {
       return dateString.split('T')[0] || 'Unknown';
+    }
+  };
+  
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'live':
+        return <Badge variant="success" className="bg-green-500">Live</Badge>;
+      case 'closed':
+        return <Badge variant="outline" className="bg-gray-200">Closed</Badge>;
+      default: // 'draft' or any other status
+        return <Badge variant="outline">Draft</Badge>;
     }
   };
 
@@ -198,18 +204,10 @@ const ProjectDetail = () => {
           <div className="flex flex-wrap gap-3">
             <Button
               className="bg-evoting-600 hover:bg-evoting-700 text-white"
-              onClick={() => navigate(`/projects/${projectId}/voters`)}
-            >
-              <Users className="mr-2 h-4 w-4" />
-              Manage Voters
-            </Button>
-            
-            <Button
-              className="bg-evoting-600 hover:bg-evoting-700 text-white"
               onClick={handleCreateAgendaClick}
             >
               <Plus className="mr-2 h-4 w-4" />
-              Create Agenda
+              Create New Meeting
             </Button>
           </div>
         </div>
@@ -219,8 +217,9 @@ const ProjectDetail = () => {
             <TableHeader>
               <TableRow>
                 <TableHead>Title</TableHead>
-                <TableHead className="hidden md:table-cell">Start Date</TableHead>
-                <TableHead className="hidden md:table-cell">End Date</TableHead>
+                <TableHead>Description</TableHead>
+                <TableHead className="hidden md:table-cell">Created Date</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -228,8 +227,9 @@ const ProjectDetail = () => {
               {agendas.map((agenda) => (
                 <TableRow key={agenda.id}>
                   <TableCell className="font-medium">{agenda.title}</TableCell>
-                  <TableCell className="hidden md:table-cell">{formatDate(agenda.start_date)}</TableCell>
-                  <TableCell className="hidden md:table-cell">{formatDate(agenda.end_date)}</TableCell>
+                  <TableCell className="max-w-xs truncate">{agenda.description || "-"}</TableCell>
+                  <TableCell className="hidden md:table-cell">{formatDate(agenda.created_at)}</TableCell>
+                  <TableCell>{getStatusBadge(agenda.status || 'draft')}</TableCell>
                   <TableCell className="text-right">
                     <Button variant="outline" size="sm" onClick={() => navigate(`/projects/${projectId}/agenda/${agenda.id}`)}>View</Button>
                   </TableCell>
@@ -240,11 +240,11 @@ const ProjectDetail = () => {
         </div>
       </div>
       
-      {/* Create Agenda Dialog Modal */}
+      {/* Create Meeting Dialog Modal */}
       {isCreateAgendaDialogOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
           <div className="bg-white rounded-lg p-8 max-w-md w-full">
-            <h2 className="text-2xl font-bold mb-4">Create New Agenda</h2>
+            <h2 className="text-2xl font-bold mb-4">Create New Meeting</h2>
             
             <div className="space-y-4">
               <div>
@@ -252,7 +252,7 @@ const ProjectDetail = () => {
                 <Input
                   type="text"
                   id="agendaTitle"
-                  placeholder="Enter agenda title"
+                  placeholder="Enter meeting title"
                   value={newAgendaTitle}
                   onChange={(e) => setNewAgendaTitle(e.target.value)}
                 />
@@ -262,32 +262,10 @@ const ProjectDetail = () => {
                 <Label htmlFor="agendaDescription">Description</Label>
                 <Textarea
                   id="agendaDescription"
-                  placeholder="Enter agenda description"
+                  placeholder="Enter meeting description"
                   value={newAgendaDescription}
                   onChange={(e) => setNewAgendaDescription(e.target.value)}
                 />
-              </div>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="agendaStartDate">Start Date</Label>
-                  <Input
-                    type="date"
-                    id="agendaStartDate"
-                    value={newAgendaStartDate}
-                    onChange={(e) => setNewAgendaStartDate(e.target.value)}
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="agendaEndDate">End Date</Label>
-                  <Input
-                    type="date"
-                    id="agendaEndDate"
-                    value={newAgendaEndDate}
-                    onChange={(e) => setNewAgendaEndDate(e.target.value)}
-                  />
-                </div>
               </div>
             </div>
             
