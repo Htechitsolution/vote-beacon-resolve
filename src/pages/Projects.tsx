@@ -290,11 +290,6 @@ const Projects = () => {
           </div>
           
           <div className="flex items-center gap-4">
-            {isSuper && (
-              <Button variant="outline" asChild>
-                <Link to="/admin/dashboard">Super Admin</Link>
-              </Button>
-            )}
             <Button 
               className="bg-evoting-600 hover:bg-evoting-700 text-white"
               onClick={() => setCreateDialogOpen(true)}
