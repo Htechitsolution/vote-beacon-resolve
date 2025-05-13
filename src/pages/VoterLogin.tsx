@@ -6,7 +6,9 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
+import { toast } from '@/components/ui/use-toast';
+import Header from '@/components/layout/Header';
+import Footer from '@/components/layout/Footer';
 
 const VoterLogin = () => {
   const [email, setEmail] = useState('');
@@ -18,7 +20,11 @@ const VoterLogin = () => {
     e.preventDefault();
     
     if (!email) {
-      toast.error('Please enter your email');
+      toast({
+        title: "Error",
+        description: "Please enter your email",
+        variant: "destructive"
+      });
       return;
     }
     
@@ -34,7 +40,11 @@ const VoterLogin = () => {
       if (voterError) throw voterError;
       
       if (!voterData || voterData.length === 0) {
-        toast.error('This email is not registered as a voter for any meetings');
+        toast({
+          title: "Error",
+          description: "This email is not registered as a voter for any meetings",
+          variant: "destructive"
+        });
         setIsLoading(false);
         return;
       }
@@ -60,7 +70,10 @@ const VoterLogin = () => {
           
           if (signUpError) throw signUpError;
           
-          toast.success('Account created successfully! Please login now.');
+          toast({
+            title: "Success",
+            description: "Account created successfully! Please login now."
+          });
           
           // Try login again
           const { error: loginError } = await supabase.auth.signInWithPassword({
@@ -70,7 +83,10 @@ const VoterLogin = () => {
           
           if (loginError) throw loginError;
           
-          toast.success('Logged in successfully');
+          toast({
+            title: "Success",
+            description: "Logged in successfully"
+          });
           navigate('/voter-dashboard');
         } else {
           throw error;
@@ -82,77 +98,88 @@ const VoterLogin = () => {
           .update({ status: 'active' })
           .eq('email', email.trim().toLowerCase());
         
-        toast.success('Logged in successfully');
+        toast({
+          title: "Success",
+          description: "Logged in successfully"
+        });
         navigate('/voter-dashboard');
       }
     } catch (error: any) {
       console.error('Login error:', error.message);
-      toast.error(error.message);
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-md">
-        <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold">Voter Login</h1>
-          <p className="mt-2 text-gray-600">
-            Login with your email to access meetings
-          </p>
-        </div>
-        
-        <Card>
-          <CardHeader>
-            <CardTitle>Login</CardTitle>
-            <CardDescription>
-              Enter your email to login and vote
-            </CardDescription>
-          </CardHeader>
+    <div className="flex flex-col min-h-screen">
+      <Header />
+      <div className="flex-grow flex items-center justify-center bg-gray-50 px-4 py-12 bg-[url('/background.jpg')] bg-cover bg-center">
+        <div className="w-full max-w-md">
+          <div className="mb-8 text-center">
+            <h1 className="text-3xl font-bold text-white drop-shadow-md">Voter Login</h1>
+            <p className="mt-2 text-gray-100 drop-shadow-md">
+              Login with your email to access meetings
+            </p>
+          </div>
           
-          <form onSubmit={handleLogin}>
-            <CardContent>
-              <div className="grid gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="name@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
-                </div>
-                
-                <div className="grid gap-2">
-                  <Label htmlFor="password">Password</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    disabled
-                  />
-                  <p className="text-xs text-gray-500">Default password: Voter@1234</p>
-                </div>
-              </div>
-            </CardContent>
+          <Card className="bg-white/95 backdrop-blur-sm">
+            <CardHeader>
+              <CardTitle>Login</CardTitle>
+              <CardDescription>
+                Enter your email to login and vote
+              </CardDescription>
+            </CardHeader>
             
-            <CardFooter>
-              <Button 
-                className="w-full bg-evoting-600 hover:bg-evoting-700" 
-                type="submit"
-                disabled={isLoading}
-              >
-                {isLoading ? "Logging in..." : "Log In"}
-              </Button>
-            </CardFooter>
-          </form>
-        </Card>
+            <form onSubmit={handleLogin}>
+              <CardContent>
+                <div className="grid gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="name@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                    />
+                  </div>
+                  
+                  <div className="grid gap-2">
+                    <Label htmlFor="password">Password</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      disabled
+                    />
+                    <p className="text-xs text-gray-500">Default password: Voter@1234</p>
+                  </div>
+                </div>
+              </CardContent>
+              
+              <CardFooter>
+                <Button 
+                  className="w-full bg-evoting-600 hover:bg-evoting-700" 
+                  type="submit"
+                  disabled={isLoading}
+                >
+                  {isLoading ? "Logging in..." : "Log In"}
+                </Button>
+              </CardFooter>
+            </form>
+          </Card>
+        </div>
       </div>
+      <Footer />
     </div>
   );
 };

@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent } from "@/components/ui/card";
-import { Plus, Calendar, Users } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Plus, Calendar, Users, CreditCard } from "lucide-react";
 import { format } from "date-fns";
 import {
   Table,
@@ -15,11 +15,10 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  TableVotingStatus
 } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/use-toast";
 import Navigation from "@/components/layout/Navigation";
 import {
   Breadcrumb,
@@ -55,6 +54,7 @@ const ProjectDetail = () => {
   const [isCreateAgendaDialogOpen, setIsCreateAgendaDialogOpen] = useState(false);
   const [newAgendaTitle, setNewAgendaTitle] = useState("");
   const [newAgendaDescription, setNewAgendaDescription] = useState("");
+  const [availableCredits, setAvailableCredits] = useState(25); // Mock credits
   const { user } = useAuth();
 
   useEffect(() => {
@@ -82,7 +82,11 @@ const ProjectDetail = () => {
       setProject(data);
     } catch (error: any) {
       console.error("Error fetching project:", error.message);
-      toast.error("Failed to load project");
+      toast({
+        title: "Error", 
+        description: "Failed to load project", 
+        variant: "destructive"
+      });
     }
   };
 
@@ -101,7 +105,11 @@ const ProjectDetail = () => {
       setAgendas(data || []);
     } catch (error: any) {
       console.error("Error fetching agendas:", error.message);
-      toast.error("Failed to load agendas");
+      toast({
+        title: "Error", 
+        description: "Failed to load agendas",
+        variant: "destructive"
+      });
     }
   };
 
@@ -118,12 +126,20 @@ const ProjectDetail = () => {
   const handleCreateAgenda = async () => {
     try {
       if (!newAgendaTitle || !newAgendaDescription) {
-        toast.error("Please fill in all fields");
+        toast({
+          title: "Error", 
+          description: "Please fill in all fields",
+          variant: "destructive"
+        });
         return;
       }
 
       if (!projectId) {
-        toast.error("Project ID is missing");
+        toast({
+          title: "Error", 
+          description: "Project ID is missing",
+          variant: "destructive"
+        });
         return;
       }
 
@@ -145,10 +161,17 @@ const ProjectDetail = () => {
 
       setAgendas([...agendas, ...(data || [])]);
       handleCloseCreateAgendaDialog();
-      toast.success("Meeting created successfully!");
+      toast({
+        title: "Success",
+        description: "Meeting created successfully!"
+      });
     } catch (error: any) {
       console.error("Error creating agenda:", error.message);
-      toast.error("Failed to create meeting");
+      toast({
+        title: "Error", 
+        description: "Failed to create meeting",
+        variant: "destructive"
+      });
     }
   };
 
@@ -163,7 +186,7 @@ const ProjectDetail = () => {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'live':
-        return <Badge variant="success" className="bg-green-500">Live</Badge>;
+        return <Badge variant="default" className="bg-green-500">Live</Badge>;
       case 'closed':
         return <Badge variant="outline" className="bg-gray-200">Closed</Badge>;
       default: // 'draft' or any other status
@@ -203,6 +226,22 @@ const ProjectDetail = () => {
           </div>
           
           <div className="flex flex-wrap gap-3">
+            <Card className="border border-amber-200 bg-amber-50">
+              <CardContent className="py-3 px-4 flex items-center">
+                <CreditCard className="mr-2 h-5 w-5 text-amber-600" />
+                <span className="text-amber-800 font-medium">{availableCredits} Credits Available</span>
+              </CardContent>
+            </Card>
+            
+            <Button
+              variant="outline"
+              className="border-amber-500 text-amber-700 hover:bg-amber-50"
+              onClick={() => navigate('/checkout')}
+            >
+              <CreditCard className="mr-2 h-4 w-4" />
+              Buy Credits
+            </Button>
+            
             <Button
               className="bg-evoting-600 hover:bg-evoting-700 text-white"
               onClick={handleCreateAgendaClick}
@@ -221,31 +260,48 @@ const ProjectDetail = () => {
           </div>
         </div>
         
-        <div className="border rounded-lg overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Title</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead className="hidden md:table-cell">Created Date</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {agendas.map((agenda) => (
-                <TableRow key={agenda.id}>
-                  <TableCell className="font-medium">{agenda.title}</TableCell>
-                  <TableCell className="max-w-xs truncate">{agenda.description || "-"}</TableCell>
-                  <TableCell className="hidden md:table-cell">{formatDate(agenda.created_at)}</TableCell>
-                  <TableCell>{getStatusBadge(agenda.status || 'draft')}</TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="outline" size="sm" onClick={() => navigate(`/projects/${projectId}/agenda/${agenda.id}`)}>View</Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+        <div className="grid grid-cols-1 gap-6 mb-8">
+          {agendas.map((agenda) => (
+            <Card key={agenda.id} className="overflow-hidden hover:shadow-md transition-shadow">
+              <div className="flex flex-col md:flex-row">
+                <div className="flex-1 p-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="font-bold text-xl">{agenda.title}</h3>
+                    {getStatusBadge(agenda.status || 'draft')}
+                  </div>
+                  <p className="text-gray-600 mb-3">{agenda.description}</p>
+                  <div className="flex flex-wrap items-center text-sm text-gray-500 gap-3">
+                    <span className="flex items-center">
+                      <Calendar className="mr-1 h-4 w-4" />
+                      Created: {formatDate(agenda.created_at)}
+                    </span>
+                  </div>
+                </div>
+                <div className="bg-gray-50 p-6 flex items-center justify-center md:border-l border-gray-100">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => navigate(`/projects/${projectId}/agenda/${agenda.id}`)}
+                  >
+                    View Details
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          ))}
+          
+          {agendas.length === 0 && (
+            <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+              <h3 className="text-xl font-medium text-gray-600 mb-2">No meetings found</h3>
+              <p className="text-gray-500 mb-6">Create your first meeting to get started</p>
+              <Button 
+                className="bg-evoting-600 hover:bg-evoting-700 text-white"
+                onClick={handleCreateAgendaClick}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Create New Meeting
+              </Button>
+            </div>
+          )}
         </div>
       </div>
       

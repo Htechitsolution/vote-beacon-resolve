@@ -12,6 +12,7 @@ const Header = () => {
     <header className="sticky top-0 w-full bg-white/90 backdrop-blur-sm border-b border-gray-200 z-50">
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2">
+          <img src="/logo.png" alt="The-Evoting Logo" className="h-8 w-auto" />
           <span className="text-2xl font-bold bg-clip-text text-evoting-800">
             The-Evoting
           </span>
@@ -30,12 +31,6 @@ const Header = () => {
             onClick={() => navigate("/login")}
           >
             Admin Login
-          </Button>
-          <Button 
-            className="bg-evoting-600 hover:bg-evoting-700 text-white"
-            onClick={() => navigate("/register")}
-          >
-            Register
           </Button>
         </nav>
 
@@ -72,15 +67,6 @@ const Header = () => {
                   }}
                 >
                   Admin Login
-                </Button>
-                <Button 
-                  className="w-full bg-evoting-600 hover:bg-evoting-700 text-white"
-                  onClick={() => {
-                    navigate("/register");
-                    setIsMenuOpen(false);
-                  }}
-                >
-                  Register
                 </Button>
               </div>
             </div>

@@ -13,6 +13,7 @@ import NotFoundPage from './pages/NotFound';
 import TermsPage from './pages/Terms';
 import PrivacyPage from './pages/Privacy';
 import SuperAdminPage from './pages/SuperAdmin';
+import AdminDashboardPage from './pages/AdminDashboard';
 import ProjectsPage from './pages/Projects';
 import ProjectDetailPage from './pages/ProjectDetail';
 import AgendaDetailPage from './pages/AgendaDetail';
@@ -21,6 +22,7 @@ import VoterManagementPage from './pages/VoterManagement';
 import VoterLoginPage from './pages/VoterLogin';
 import VoterDashboardPage from './pages/VoterDashboard';
 import VoterMeetingPage from './pages/VoterMeeting';
+import CheckoutPage from './pages/Checkout';
 import ProtectedRoute from './components/ProtectedRoute';
 import SuperAdminRoute from './components/SuperAdminRoute';
 
@@ -35,6 +37,7 @@ function App() {
         <Route path="/terms" element={<TermsPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/contact-us" element={<ContactUsPage />} />
+        <Route path="/checkout" element={<CheckoutPage />} />
         
         {/* Protected routes */}
         <Route element={<ProtectedRoute />}>
@@ -49,6 +52,7 @@ function App() {
         {/* Super admin routes */}
         <Route element={<SuperAdminRoute />}>
           <Route path="/super-admin" element={<SuperAdminPage />} />
+          <Route path="/admin-dashboard" element={<AdminDashboardPage />} />
         </Route>
         
         {/* Voter routes */}
