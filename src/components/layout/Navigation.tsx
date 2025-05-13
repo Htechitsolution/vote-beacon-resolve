@@ -40,7 +40,18 @@ const Navigation = () => {
     }
   };
   
-  
+  const navLinks: NavLink[] = [
+    {
+      label: "Projects",
+      href: "/projects",
+      icon: FileText
+    },
+    {
+      label: "Contact",
+      href: "/contact-us",
+      icon: User
+    },
+  ];
 
   // Add Admin Dashboard link for super admins
   if (profile?.role === "super_admin") {
