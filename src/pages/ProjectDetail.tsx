@@ -102,8 +102,7 @@ const ProjectDetail = () => {
       setProject(data);
     } catch (error: any) {
       console.error("Error fetching project:", error.message);
-      toast({
-        title: "Error",
+      toast("Error", {
         description: "Failed to load project", 
         variant: "destructive"
       });
@@ -125,8 +124,7 @@ const ProjectDetail = () => {
       setAgendas(data || []);
     } catch (error: any) {
       console.error("Error fetching agendas:", error.message);
-      toast({
-        title: "Error",
+      toast("Error", {
         description: "Failed to load agendas",
         variant: "destructive"
       });
@@ -135,8 +133,7 @@ const ProjectDetail = () => {
 
   const handleCreateAgendaClick = () => {
     if (availableCredits <= 0) {
-      toast({
-        title: "Insufficient Credits",
+      toast("Insufficient Credits", {
         description: "You need at least 1 credit to create a new meeting. Please purchase more credits.",
         variant: "destructive"
       });
@@ -154,8 +151,7 @@ const ProjectDetail = () => {
   const handleCreateAgenda = async () => {
     try {
       if (!newAgendaTitle || !newAgendaDescription) {
-        toast({
-          title: "Error",
+        toast("Error", {
           description: "Please fill in all fields",
           variant: "destructive"
         });
@@ -163,8 +159,7 @@ const ProjectDetail = () => {
       }
 
       if (!projectId) {
-        toast({
-          title: "Error",
+        toast("Error", {
           description: "Project ID is missing",
           variant: "destructive"
         });
@@ -172,8 +167,7 @@ const ProjectDetail = () => {
       }
 
       if (availableCredits <= 0) {
-        toast({
-          title: "Insufficient Credits",
+        toast("Insufficient Credits", {
           description: "You need at least 1 credit to create a new meeting",
           variant: "destructive"
         });
@@ -214,14 +208,12 @@ const ProjectDetail = () => {
       // Update local credit count
       setAvailableCredits(availableCredits - 1);
       
-      toast({
-        title: "Success",
+      toast("Success", {
         description: "Meeting created successfully! 1 credit has been deducted from your account."
       });
     } catch (error: any) {
       console.error("Error creating agenda:", error.message);
-      toast({
-        title: "Error",
+      toast("Error", {
         description: "Failed to create meeting: " + error.message,
         variant: "destructive"
       });

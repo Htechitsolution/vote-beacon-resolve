@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -50,6 +49,9 @@ interface User {
   company_name: string | null;
   credits: number;
   created_at: string;
+  role: string;
+  updated_at: string;
+  meeting_count?: number;
 }
 
 interface SubscriptionPlan {
@@ -104,7 +106,12 @@ const AdminDashboard = () => {
 
       if (userError) throw userError;
       
-      setUsers(userData || []);
+      const usersWithCredits = userData.map(user => ({
+        ...user,
+        credits: user.credits || 0 // Ensure credits is not null
+      }));
+      
+      setUsers(usersWithCredits);
       
       // Fetch projects stats
       const { data: projectsData, error: projectsError } = await supabase
@@ -131,8 +138,7 @@ const AdminDashboard = () => {
       
     } catch (error: any) {
       console.error("Error fetching data:", error.message);
-      toast({
-        title: "Error",
+      toast("Error", {
         description: "Failed to load dashboard data",
         variant: "destructive"
       });
@@ -143,8 +149,7 @@ const AdminDashboard = () => {
 
   const handleAddPlan = () => {
     if (!newPlan.name || !newPlan.description || newPlan.price <= 0 || newPlan.credits <= 0) {
-      toast({
-        title: "Error",
+      toast("Error", {
         description: "Please fill in all plan details",
         variant: "destructive"
       });
@@ -156,8 +161,7 @@ const AdminDashboard = () => {
     setNewPlan({ name: "", description: "", price: 0, credits: 0 });
     setIsAddingPlan(false);
     
-    toast({
-      title: "Success",
+    toast("Success", {
       description: "Subscription plan added successfully"
     });
   };
@@ -181,8 +185,7 @@ const AdminDashboard = () => {
     
     setPlans(updatedPlans);
     setIsEditingPlan(false);
-    toast({
-      title: "Success",
+    toast("Success", {
       description: "Plan updated successfully"
     });
   };
@@ -194,8 +197,7 @@ const AdminDashboard = () => {
     setPlans(filteredPlans);
     setIsDeletingPlan(false);
     
-    toast({
-      title: "Success",
+    toast("Success", {
       description: "Plan deleted successfully"
     });
   };
@@ -223,13 +225,14 @@ const AdminDashboard = () => {
           <h1 className="text-2xl font-bold text-red-600">Access Denied</h1>
           <p className="mt-2">You don't have permission to access this page.</p>
           <Button className="mt-4 bg-evoting-600 hover:bg-evoting-700 text-white" asChild>
-            <Link to="/projects">Back to Projects</Link>
+            <Link to="/projects">Back to Projects</a>
           </Button>
         </div>
       </div>
     );
   }
 
+  
   return (
     <div>
       <Navigation />
@@ -406,8 +409,8 @@ const AdminDashboard = () => {
                     <Input 
                       id="plan-price"
                       type="number" 
-                      value={newPlan.price / 100} 
-                      onChange={(e) => setNewPlan({...newPlan, price: Math.round(parseFloat(e.target.value) * 100)})}
+                      value={newPlan.price === 0 ? '' : (newPlan.price / 100)} 
+                      onChange={(e) => setNewPlan({...newPlan, price: Math.round(parseFloat(e.target.value || '0') * 100)})}
                       placeholder="e.g. 999.99"
                     />
                     <p className="text-xs text-gray-500">Enter the price in INR (Indian Rupees)</p>
@@ -417,8 +420,8 @@ const AdminDashboard = () => {
                     <Input 
                       id="plan-credits"
                       type="number" 
-                      value={newPlan.credits} 
-                      onChange={(e) => setNewPlan({...newPlan, credits: parseInt(e.target.value)})}
+                      value={newPlan.credits || ''} 
+                      onChange={(e) => setNewPlan({...newPlan, credits: parseInt(e.target.value || '0')})}
                       placeholder="e.g. 100"
                     />
                   </div>
@@ -464,7 +467,7 @@ const AdminDashboard = () => {
                       id="edit-plan-price"
                       type="number" 
                       value={currentPlan.price / 100} 
-                      onChange={(e) => setCurrentPlan({...currentPlan, price: Math.round(parseFloat(e.target.value) * 100)})}
+                      onChange={(e) => setCurrentPlan({...currentPlan, price: Math.round(parseFloat(e.target.value || '0') * 100)})}
                     />
                     <p className="text-xs text-gray-500">Enter the price in INR (Indian Rupees)</p>
                   </div>
@@ -474,7 +477,7 @@ const AdminDashboard = () => {
                       id="edit-plan-credits"
                       type="number" 
                       value={currentPlan.credits} 
-                      onChange={(e) => setCurrentPlan({...currentPlan, credits: parseInt(e.target.value)})}
+                      onChange={(e) => setCurrentPlan({...currentPlan, credits: parseInt(e.target.value || '0')})}
                     />
                   </div>
                 </div>
@@ -533,6 +536,7 @@ const AdminDashboard = () => {
                     <TableHead className="hidden md:table-cell">Company</TableHead>
                     <TableHead className="hidden md:table-cell">Joined</TableHead>
                     <TableHead>Credits</TableHead>
+                    <TableHead>Meetings</TableHead>
                     <TableHead>Add Credits</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -549,6 +553,7 @@ const AdminDashboard = () => {
                           {user.credits || 0}
                         </span>
                       </TableCell>
+                      <TableCell>{user.meeting_count || 0}</TableCell>
                       <TableCell>
                         <Button 
                           variant="outline" 

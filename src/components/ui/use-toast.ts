@@ -14,10 +14,14 @@ export const toast = (titleOrOptions: string | ToastOptions, options?: ToastOpti
   if (typeof titleOrOptions === 'string') {
     return sonnerToast(titleOrOptions, options);
   }
-  // If it's an object, extract title and pass the rest as options
-  else {
+  // If it's an object with a title property, extract title and pass the rest as options
+  else if (titleOrOptions && typeof titleOrOptions === 'object' && 'title' in titleOrOptions) {
     const { title, ...restOptions } = titleOrOptions as { title: string; [key: string]: any };
     return sonnerToast(title, restOptions);
+  }
+  // Fallback for any other cases
+  else {
+    return sonnerToast(String(titleOrOptions), options);
   }
 };
 

@@ -101,8 +101,7 @@ const SuperAdmin = () => {
       setUsers(usersWithMeetingCount || []);
     } catch (error: any) {
       console.error("Error fetching users:", error.message);
-      toast({
-        title: "Error",
+      toast("Error", {
         description: "Failed to load users"
       });
     } finally {
@@ -118,8 +117,7 @@ const SuperAdmin = () => {
 
   const handleAddCredits = async () => {
     if (!selectedUser || creditsToAdd <= 0) {
-      toast({
-        title: "Error",
+      toast("Error", {
         description: "Please enter a valid number of credits to add",
         variant: "destructive"
       });
@@ -151,14 +149,12 @@ const SuperAdmin = () => {
       );
       
       setIsAddCreditsDialogOpen(false);
-      toast({
-        title: "Success",
+      toast("Success", {
         description: `${creditsToAdd} credits added to ${selectedUser.name}'s account`
       });
     } catch (error: any) {
       console.error("Error adding credits:", error.message);
-      toast({
-        title: "Error",
+      toast("Error", {
         description: `Failed to add credits: ${error.message}`,
         variant: "destructive"
       });
@@ -335,7 +331,7 @@ const SuperAdmin = () => {
                   <Input
                     id="add-credits"
                     type="number"
-                    value={creditsToAdd}
+                    value={creditsToAdd || ''}
                     onChange={(e) => setCreditsToAdd(Math.max(0, parseInt(e.target.value) || 0))}
                     className="flex-1"
                     min="1"

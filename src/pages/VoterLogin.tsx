@@ -1,196 +1,198 @@
 
-import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { supabase } from '@/integrations/supabase/client';
-import { useNavigate, Link } from 'react-router-dom';
-import { toast } from '@/components/ui/use-toast';
-import Header from '@/components/layout/Header';
-import Footer from '@/components/layout/Footer';
+import React, { useState, useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/components/ui/use-toast";
+import { HelpCircle, Mail } from "lucide-react";
 
 const VoterLogin = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('Voter@1234'); // Default password
-  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
-
+  const { projectId } = useParams();
+  const [email, setEmail] = useState("");
+  const [voterId, setVoterId] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [projectName, setProjectName] = useState("");
+  
+  useEffect(() => {
+    const fetchProjectName = async () => {
+      if (!projectId) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('projects')
+          .select('title')
+          .eq('id', projectId)
+          .single();
+          
+        if (error) throw error;
+        
+        if (data) {
+          setProjectName(data.title);
+        }
+      } catch (error: any) {
+        console.error("Error fetching project:", error.message);
+        toast("Error", {
+          description: "Failed to load project information",
+        });
+      }
+    };
+    
+    fetchProjectName();
+  }, [projectId]);
+  
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!email) {
-      toast({
-        title: "Please enter your email",
-        description: "Email is required to log in"
+    if (!email || !voterId) {
+      toast("Error", {
+        description: "Please enter your email and voter ID",
+        variant: "destructive"
       });
       return;
     }
     
     try {
-      setIsLoading(true);
+      setLoading(true);
       
-      // First check if the voter exists in the system
+      // Check if voter exists with given email and voter_id
       const { data: voterData, error: voterError } = await supabase
         .from('voters')
-        .select('email, project_id')
-        .eq('email', email.trim().toLowerCase());
-      
-      if (voterError) throw voterError;
-      
-      if (!voterData || voterData.length === 0) {
-        toast({
-          title: "Error",
-          description: "This email is not registered as a voter for any meetings",
-          variant: "destructive"
-        });
-        setIsLoading(false);
-        return;
+        .select('*')
+        .eq('email', email)
+        .eq('voter_id', voterId)
+        .eq('project_id', projectId)
+        .single();
+        
+      if (voterError) {
+        if (voterError.message.includes('No rows found')) {
+          throw new Error('Invalid credentials. Please check your email and voter ID.');
+        }
+        throw voterError;
       }
       
-      // Try to sign in
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
-        password,
+      if (!voterData) {
+        throw new Error('Invalid credentials. Please check your email and voter ID.');
+      }
+      
+      // Store voter info in session storage
+      sessionStorage.setItem('voter', JSON.stringify({
+        id: voterData.id,
+        email: voterData.email,
+        name: voterData.name,
+        project_id: voterData.project_id,
+        company_name: voterData.company_name,
+        voting_weight: voterData.voting_weight
+      }));
+      
+      // Update voter status to active
+      await supabase
+        .from('voters')
+        .update({ status: 'active' })
+        .eq('id', voterData.id);
+      
+      // Redirect to voter dashboard
+      navigate(`/projects/${projectId}/voter-dashboard`);
+      
+      toast("Success", {
+        description: "Login successful!",
       });
       
-      if (error) {
-        // If error is about invalid credentials, the user might not exist yet
-        if (error.message.includes('Invalid login credentials')) {
-          const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-            email: email.trim().toLowerCase(),
-            password,
-            options: {
-              data: {
-                role: 'voter'
-              }
-            }
-          });
-          
-          if (signUpError) throw signUpError;
-          
-          toast({
-            title: "Success",
-            description: "Account created successfully! Please login now."
-          });
-          
-          // Try login again
-          const { error: loginError } = await supabase.auth.signInWithPassword({
-            email: email.trim().toLowerCase(),
-            password,
-          });
-          
-          if (loginError) throw loginError;
-          
-          toast({
-            title: "Success",
-            description: "Logged in successfully"
-          });
-          navigate('/voter-dashboard');
-        } else {
-          throw error;
-        }
-      } else {
-        // Update voter status to active
-        await supabase
-          .from('voters')
-          .update({ status: 'active' })
-          .eq('email', email.trim().toLowerCase());
-        
-        toast({
-          title: "Success",
-          description: "Logged in successfully"
-        });
-        navigate('/voter-dashboard');
-      }
     } catch (error: any) {
-      console.error('Login error:', error.message);
-      toast({
-        title: "Error",
-        description: error.message,
+      console.error("Login error:", error.message);
+      toast("Error", {
+        description: error.message || "Failed to login. Please try again.",
         variant: "destructive"
       });
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
+  };
+  
+  const handleGoBack = () => {
+    navigate('/');
   };
 
   return (
-    <div className="flex flex-col min-h-screen">
-      <Header />
-      <div className="flex-grow flex items-center justify-center px-4 py-12 bg-[url('/background.jpg')] bg-cover bg-center">
-        <div className="w-full max-w-md">
-          <div className="mb-8 text-center">
-            <h1 className="text-3xl font-bold text-white drop-shadow-md">Voter Login</h1>
-            <p className="mt-2 text-gray-100 drop-shadow-md">
-              Login with your email to access meetings and cast your votes
-            </p>
-          </div>
-          
-          <Card className="bg-white/95 backdrop-blur-sm shadow-xl">
-            <CardHeader className="space-y-1">
-              <CardTitle className="text-2xl text-center">Welcome Back</CardTitle>
-              <CardDescription className="text-center">
-                Enter your email to access your meetings
-              </CardDescription>
-            </CardHeader>
-            
-            <form onSubmit={handleLogin}>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email Address</Label>
+    <div className="min-h-screen bg-gradient-to-br from-evoting-50 to-evoting-100 flex items-center justify-center p-4"
+         style={{
+           backgroundImage: "url('https://images.unsplash.com/photo-1541435469116-8ce8ccc4ff85?q=80&w=1976&auto=format&fit=crop&ixlib=rb-4.0.3')",
+           backgroundSize: "cover",
+           backgroundPosition: "center"
+         }}>
+      <div className="absolute inset-0 bg-black bg-opacity-50 backdrop-blur-sm"></div>
+      
+      <Card className="w-full max-w-md shadow-xl border-0 relative">
+        <CardHeader className="space-y-1 pb-4 text-center">
+          <CardTitle className="text-2xl font-bold text-evoting-800">Voter Login</CardTitle>
+          <CardDescription>
+            {projectName ? `Enter your credentials for ${projectName}` : 'Enter your voter credentials'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <form onSubmit={handleLogin}>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label htmlFor="email" className="text-sm font-medium text-gray-700">Email</label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 h-4 w-4" />
                   <Input
                     id="email"
                     type="email"
-                    placeholder="name@example.com"
+                    placeholder="Enter your email"
+                    className="pl-10"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
-                    className="h-11"
                   />
                 </div>
-                
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="password">Password</Label>
-                    <span className="text-xs text-gray-500">Pre-configured</span>
-                  </div>
-                  <Input
-                    id="password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    disabled
-                    className="h-11 bg-gray-50"
-                  />
-                  <p className="text-xs text-gray-500">Using default password: Voter@1234</p>
-                </div>
-              </CardContent>
+              </div>
               
-              <CardFooter className="flex flex-col space-y-4">
-                <Button 
-                  className="w-full h-11 text-base bg-evoting-600 hover:bg-evoting-700" 
-                  type="submit"
-                  disabled={isLoading}
-                >
-                  {isLoading ? "Logging in..." : "Log In as Voter"}
-                </Button>
-                
-                <div className="w-full text-center space-y-2">
-                  <p className="text-sm text-gray-500">
-                    Are you an administrator?
-                  </p>
-                  <Button variant="outline" asChild className="w-full">
-                    <Link to="/login">Admin Login</Link>
-                  </Button>
-                </div>
-              </CardFooter>
-            </form>
-          </Card>
-        </div>
-      </div>
-      <Footer />
+              <div className="space-y-2">
+                <label htmlFor="voter-id" className="text-sm font-medium text-gray-700">Voter ID</label>
+                <Input
+                  id="voter-id"
+                  type="password"
+                  placeholder="Enter your voter ID"
+                  value={voterId}
+                  onChange={(e) => setVoterId(e.target.value)}
+                  required
+                />
+              </div>
+              
+              <Button
+                type="submit"
+                className="w-full bg-evoting-600 hover:bg-evoting-700 text-white"
+                disabled={loading}
+              >
+                {loading ? "Logging in..." : "Login"}
+              </Button>
+            </div>
+          </form>
+          
+          <div className="mt-4 pt-4 border-t border-gray-100 text-center">
+            <p className="text-sm text-gray-600">
+              <HelpCircle className="inline-block mr-1 h-4 w-4" />
+              Having trouble logging in? Contact your meeting administrator
+            </p>
+            <Button
+              variant="ghost"
+              className="mt-2 text-evoting-600"
+              onClick={handleGoBack}
+            >
+              Back to Home
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
