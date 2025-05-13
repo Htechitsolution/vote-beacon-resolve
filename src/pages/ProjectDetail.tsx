@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, Calendar } from "lucide-react";
+import { Plus, Calendar, Users } from "lucide-react";
 import { format } from "date-fns";
 import {
   Table,
@@ -15,6 +15,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  TableVotingStatus
 } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -208,6 +209,14 @@ const ProjectDetail = () => {
             >
               <Plus className="mr-2 h-4 w-4" />
               Create New Meeting
+            </Button>
+            
+            <Button
+              variant="outline"
+              onClick={() => navigate(`/projects/${projectId}/voters`)}
+            >
+              <Users className="mr-2 h-4 w-4" />
+              Manage Voters
             </Button>
           </div>
         </div>

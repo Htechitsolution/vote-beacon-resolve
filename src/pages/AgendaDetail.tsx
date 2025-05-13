@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
@@ -593,7 +592,14 @@ const AgendaDetail = () => {
                   </Link>
                 </Button>
                 
-                {/* Status badge only shown in small detail, not above title */}
+                <Button
+                  variant="outline"
+                  onClick={() => navigate(`/projects/${projectId}/voters`)}
+                >
+                  <Users className="mr-2 h-4 w-4" />
+                  Manage Voters
+                </Button>
+                
                 <div className="hidden sm:flex items-center">
                   {getStatusBadge(agenda.status)}
                 </div>
@@ -665,26 +671,30 @@ const AgendaDetail = () => {
                         <CardHeader className="pb-3">
                           <div className="flex justify-between items-start">
                             <CardTitle className="text-lg">{item.title}</CardTitle>
-                            <Button 
-                              size="sm" 
-                              variant="ghost" 
-                              onClick={() => handleViewAgendaItem(item.id)}
-                            >
-                              {selectedAgendaItem === item.id ? "Hide Details" : "View Details"}
-                            </Button>
+                            <div className="text-sm text-gray-500">
+                              Required Approval: {item.required_approval || 50}%
+                            </div>
                           </div>
                         </CardHeader>
                         
                         {/* Voting status bar */}
                         <CardContent className="pb-2">
                           {agenda.status !== 'draft' && (
-                            <TableVotingStatus
-                              approved={item.votes?.approved || 0}
-                              disapproved={item.votes?.disapproved || 0}
-                              abstained={item.votes?.abstained || 0}
-                              requiredApproval={item.required_approval || 50}
-                              className="mb-3"
-                            />
+                            <>
+                              <div className="mb-1 flex justify-between text-xs text-gray-500">
+                                <div>Approved: {item.votes?.approved || 0}%</div>
+                                <div>Against: {item.votes?.disapproved || 0}%</div>
+                                <div>Abstained: {item.votes?.abstained || 0}%</div>
+                              </div>
+                              
+                              <TableVotingStatus
+                                approved={item.votes?.approved || 0}
+                                disapproved={item.votes?.disapproved || 0}
+                                abstained={item.votes?.abstained || 0}
+                                requiredApproval={item.required_approval || 50}
+                                className="mb-3"
+                              />
+                            </>
                           )}
                           
                           <p className="text-gray-700 text-sm">{item.description || "No description provided."}</p>
@@ -703,6 +713,15 @@ const AgendaDetail = () => {
                             </div>
                           )}
                         </CardContent>
+                        
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          onClick={() => handleViewAgendaItem(item.id)}
+                          className="w-full py-2"
+                        >
+                          {selectedAgendaItem === item.id ? "Hide Details" : "View Details"}
+                        </Button>
                         
                         {/* Detailed voter list for this agenda item */}
                         {selectedAgendaItem === item.id && (
@@ -913,81 +932,3 @@ const AgendaDetail = () => {
             <div className="bg-amber-50 border border-amber-200 rounded-md p-3 flex items-start gap-2">
               <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
               <p className="text-sm text-amber-700">
-                Once voting starts, you will not be able to add more agenda items. Voting will automatically close on the selected end date.
-              </p>
-            </div>
-          </div>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="outline">Cancel</Button>
-            </DialogClose>
-            <Button 
-              onClick={confirmStartVoting}
-              className="bg-evoting-600 hover:bg-evoting-700 text-white"
-              disabled={!selectedEndDate}
-            >
-              Start Voting
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      
-      {/* Extend End Date Dialog */}
-      <Dialog open={isExtendEndDateDialogOpen} onOpenChange={setIsExtendEndDateDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Extend End Date</DialogTitle>
-            <DialogDescription>
-              Select a new end date for the voting period.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-col space-y-4 py-4">
-            <div className="flex flex-col space-y-2">
-              <Label>Current End Date</Label>
-              <div className="text-sm">
-                {agenda?.end_date ? format(new Date(agenda.end_date), "PPP p") : "Not set"}
-              </div>
-            </div>
-            <div className="flex flex-col space-y-2">
-              <Label htmlFor="newEndDate">New End Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={`justify-start text-left font-normal ${!selectedEndDate ? "text-muted-foreground" : ""}`}
-                  >
-                    <Calendar className="mr-2 h-4 w-4" />
-                    {selectedEndDate ? format(selectedEndDate, "PPP") : "Select new end date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <CalendarComponent
-                    mode="single"
-                    selected={selectedEndDate}
-                    onSelect={setSelectedEndDate}
-                    initialFocus
-                    disabled={(date) => date < new Date()}
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-          </div>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="outline">Cancel</Button>
-            </DialogClose>
-            <Button 
-              onClick={confirmExtendEndDate}
-              className="bg-evoting-600 hover:bg-evoting-700 text-white"
-              disabled={!selectedEndDate}
-            >
-              Extend End Date
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-};
-
-export default AgendaDetail;
