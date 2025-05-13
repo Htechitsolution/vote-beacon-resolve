@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Outlet } from 'react-router-dom';
 import { Toaster } from '@/components/ui/toaster';
 import { AuthProvider } from '@/contexts/AuthContext';
 import ProfilePage from './pages/Profile';
@@ -37,7 +37,7 @@ function App() {
         <Route path="/contact-us" element={<ContactUsPage />} />
         
         {/* Protected routes */}
-        <Route element={<ProtectedRoute />}>
+        <Route element={<ProtectedRoute><Outlet /></ProtectedRoute>}>
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/projects" element={<ProjectsPage />} />
           <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
@@ -47,7 +47,7 @@ function App() {
         </Route>
         
         {/* Super admin routes */}
-        <Route element={<SuperAdminRoute />}>
+        <Route element={<SuperAdminRoute><Outlet /></SuperAdminRoute>}>
           <Route path="/super-admin" element={<SuperAdminPage />} />
         </Route>
         
