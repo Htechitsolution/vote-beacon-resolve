@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {  Vote } from "lucide-react";
 
 const Header = () => {
   const navigate = useNavigate();
