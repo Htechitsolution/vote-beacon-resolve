@@ -1,8 +1,9 @@
+
 import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileText, ArrowLeft, Download, Mail, FileSpreadsheet } from "lucide-react";
+import { FileText, ArrowLeft, Download, Mail } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -25,8 +26,6 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
-import { exportToExcel, type ExcelExportData } from "@/lib/excelUtils";
-import { sendEmail } from "@/lib/emailUtils";
 
 type Agenda = {
   id: string;
@@ -94,7 +93,6 @@ const AgendaResults = () => {
   const [loading, setLoading] = useState(true);
   const [results, setResults] = useState<VoteResult[]>([]);
   const [sendingEmails, setSendingEmails] = useState(false);
-  const [exportingExcel, setExportingExcel] = useState(false);
   const { user, profile } = useAuth();
   const resultsRef = React.useRef<HTMLDivElement>(null);
 
@@ -290,88 +288,6 @@ const AgendaResults = () => {
     }
   };
 
-  const exportResultsToExcel = async () => {
-    try {
-      setExportingExcel(true);
-      toast.info("Preparing Excel export...");
-      
-      // Fetch all votes with voter details
-      const { data: votesWithDetails, error: votesError } = await supabase
-        .from('votes')
-        .select(`
-          id,
-          option_id,
-          voter_id,
-          value,
-          voting_weight,
-          agenda_id,
-          created_at,
-          options:option_id(title)
-        `)
-        .eq('agenda_id', agendaId);
-        
-      if (votesError) throw votesError;
-      
-      // Fetch voter details for all voters who voted
-      const voterIds = [...new Set(votesWithDetails?.map(vote => vote.voter_id) || [])];
-      let voterDetails: any[] = [];
-      
-      if (voterIds.length > 0) {
-        const { data: fetchedVoters, error: votersError } = await supabase
-          .from('voters')
-          .select('id, name, company_name, email')
-          .in('id', voterIds);
-          
-        if (votersError) throw votersError;
-        voterDetails = fetchedVoters || [];
-      }
-      
-      // Organize votes by option
-      const votesByOption: Record<string, any[]> = {};
-      
-      results.forEach(result => {
-        votesByOption[result.option_title] = [];
-      });
-      
-      votesWithDetails?.forEach(vote => {
-        const optionTitle = vote.options?.title || '';
-        const voter = voterDetails.find(v => v.id === vote.voter_id);
-        
-        if (voter && optionTitle && votesByOption[optionTitle]) {
-          votesByOption[optionTitle].push({
-            voter_name: voter.name || 'Unknown',
-            voter_company: voter.company_name,
-            voter_email: voter.email,
-            vote_value: vote.value,
-            voting_weight: vote.voting_weight || 1
-          });
-        }
-      });
-      
-      // Prepare export data
-      const exportData: ExcelExportData = {
-        projectName: project?.title || 'Project',
-        meetingTitle: agenda?.title || 'Meeting',
-        meetingDescription: agenda?.description,
-        votingPeriod: agenda?.start_date && agenda?.end_date 
-          ? `${new Date(agenda.start_date).toLocaleDateString()} to ${new Date(agenda.end_date).toLocaleDateString()}`
-          : undefined,
-        results,
-        votesByOption
-      };
-      
-      // Generate and download Excel file
-      exportToExcel(exportData);
-      
-      toast.success("Excel export completed");
-    } catch (error: any) {
-      console.error("Error exporting to Excel:", error);
-      toast.error(`Failed to export to Excel: ${error.message}`);
-    } finally {
-      setExportingExcel(false);
-    }
-  };
-
   const emailResultsToPDF = async () => {
     try {
       setSendingEmails(true);
@@ -409,33 +325,37 @@ const AgendaResults = () => {
       let successCount = 0;
       let errorCount = 0;
       
-      // Collect all recipient emails
-      const recipientEmails = voters.map(voter => voter.email);
-      
-      if (recipientEmails.length > 0) {
-        // Send the email to all voters using our new email utility
-        const result = await sendEmail(
-          recipientEmails,
-          `Voting Results for ${project?.title || 'Project'} - ${agenda?.title || 'Meeting'}`,
-          'votingResults',
-          {
-            projectName: project?.title || 'Project',
-            resultTitle: agenda?.title || 'Meeting',
-            resultUrl: fileUrl
-          }
-        );
-        
-        if (result.success) {
-          successCount = recipientEmails.length;
-        } else {
-          errorCount = recipientEmails.length;
+      for (const voter of voters) {
+        try {
+          // Send email using our edge function
+          const { error: functionError } = await supabase.functions.invoke('send-voter-otp', {
+            body: { 
+              email: voter.email,
+              otp: "RESULTS", // Not actually using this for OTP here
+              voterName: voter.name || "Voter",
+              projectName: project?.title || "Meeting",
+              isResultEmail: true,
+              resultTitle: agenda?.title || "Voting",
+              resultUrl: fileUrl
+            }
+          });
+          
+          if (functionError) throw functionError;
+          
+          successCount++;
+        } catch (error) {
+          console.error(`Failed to send results to ${voter.email}:`, error);
+          errorCount++;
         }
+        
+        // Add a small delay between emails to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
       
       if (errorCount === 0) {
         toast.success(`Successfully sent results to all ${successCount} voters`);
       } else {
-        toast.warning(`Failed to send results. Please try again later.`);
+        toast.warning(`Sent ${successCount} emails, but ${errorCount} failed. Check console for details.`);
       }
       
     } catch (error: any) {
@@ -508,22 +428,9 @@ const AgendaResults = () => {
               <p className="text-gray-600">{agenda?.description}</p>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={exportResultsToExcel} disabled={exportingExcel} className="flex items-center gap-2">
-                {exportingExcel ? (
-                  <>
-                    <span className="animate-spin mr-1 h-4 w-4 border-b-2 rounded-full border-evoting-600"></span>
-                    Exporting...
-                  </>
-                ) : (
-                  <>
-                    <FileSpreadsheet className="mr-1 h-4 w-4" />
-                    Export Excel
-                  </>
-                )}
-              </Button>
               <Button variant="outline" onClick={generatePDF} className="flex items-center gap-2">
                 <Download className="mr-1 h-4 w-4" />
-                Download PDF
+                Download Results
               </Button>
               <Button 
                 variant="outline" 
