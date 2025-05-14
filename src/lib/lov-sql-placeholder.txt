@@ -1,16 +1,17 @@
 
--- Create subscription_plans table
+-- Create subscription plans table
 CREATE TABLE IF NOT EXISTS public.subscription_plans (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   description TEXT NOT NULL,
   price INTEGER NOT NULL,
   credits INTEGER NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL
 );
 
--- Add new columns to profiles table
-ALTER TABLE public.profiles
-ADD COLUMN IF NOT EXISTS ibc_registration_number TEXT,
-ADD COLUMN IF NOT EXISTS communications_address TEXT;
+-- Add example data (optional)
+-- INSERT INTO public.subscription_plans (name, description, price, credits)
+-- VALUES 
+--   ('Basic Plan', 'Basic features with 100 credits', 10000, 100),
+--   ('Pro Plan', 'Professional features with 500 credits', 40000, 500),
+--   ('Enterprise Plan', 'Enterprise features with 2000 credits', 150000, 2000);

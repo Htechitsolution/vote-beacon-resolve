@@ -34,6 +34,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { SubscriptionPlan, getSubscriptionPlans, createSubscriptionPlan, updateSubscriptionPlan, deleteSubscriptionPlan } from "@/lib/subscriptionPlansApi";
 
 interface Stats {
   totalUsers: number;
@@ -53,14 +54,8 @@ interface User {
   role: string;
   updated_at: string;
   meeting_count?: number;
-}
-
-interface SubscriptionPlan {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  credits: number;
+  ibc_registration_number?: string | null;
+  communication_address?: string | null;
 }
 
 const AdminDashboard = () => {
@@ -138,16 +133,13 @@ const AdminDashboard = () => {
         liveMeetings: agendasData.filter(a => a.status === 'live').length,
       });
       
-      // Fetch plans from database if available, otherwise use empty array
-      const { data: plansData, error: plansError } = await supabase
-        .from('subscription_plans')
-        .select('*');
-      
-      if (plansError) {
-        console.error("Error fetching plans:", plansError);
+      // Fetch plans using our new API
+      try {
+        const plansData = await getSubscriptionPlans();
+        setPlans(plansData);
+      } catch (error: any) {
+        console.error("Error fetching plans:", error);
         setPlans([]);
-      } else {
-        setPlans(plansData || []);
       }
       
     } catch (error: any) {
@@ -165,19 +157,14 @@ const AdminDashboard = () => {
     }
     
     try {
-      const { data, error } = await supabase
-        .from('subscription_plans')
-        .insert([{
-          name: newPlan.name,
-          description: newPlan.description,
-          price: newPlan.price,
-          credits: newPlan.credits
-        }])
-        .select();
+      const addedPlan = await createSubscriptionPlan({
+        name: newPlan.name,
+        description: newPlan.description,
+        price: newPlan.price,
+        credits: newPlan.credits
+      });
       
-      if (error) throw error;
-      
-      setPlans([...plans, data[0]]);
+      setPlans([...plans, addedPlan]);
       setNewPlan({ name: "", description: "", price: 0, credits: 0 });
       setIsAddingPlan(false);
       
@@ -202,19 +189,14 @@ const AdminDashboard = () => {
     if (!currentPlan) return;
     
     try {
-      const { error } = await supabase
-        .from('subscription_plans')
-        .update({
-          name: currentPlan.name,
-          description: currentPlan.description,
-          price: currentPlan.price,
-          credits: currentPlan.credits,
-        })
-        .eq('id', currentPlan.id);
+      const updatedPlan = await updateSubscriptionPlan(currentPlan.id, {
+        name: currentPlan.name,
+        description: currentPlan.description,
+        price: currentPlan.price,
+        credits: currentPlan.credits,
+      });
       
-      if (error) throw error;
-      
-      setPlans(plans.map(p => p.id === currentPlan.id ? currentPlan : p));
+      setPlans(plans.map(p => p.id === updatedPlan.id ? updatedPlan : p));
       setIsEditingPlan(false);
       toast.success("Plan updated successfully");
     } catch (error: any) {
@@ -227,12 +209,7 @@ const AdminDashboard = () => {
     if (!currentPlan) return;
     
     try {
-      const { error } = await supabase
-        .from('subscription_plans')
-        .delete()
-        .eq('id', currentPlan.id);
-      
-      if (error) throw error;
+      await deleteSubscriptionPlan(currentPlan.id);
       
       setPlans(plans.filter(p => p.id !== currentPlan.id));
       setIsDeletingPlan(false);
