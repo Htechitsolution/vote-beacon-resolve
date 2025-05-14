@@ -1,325 +1,271 @@
-
-import React, { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
+import { Loader2, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/components/ui/use-toast";
-import { HelpCircle, Mail, RefreshCw, Send } from "lucide-react";
-import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSlot,
+} from "@/components/ui/input-otp";
+
+// Import our email service
+import { sendEmail } from '@/lib/emailUtils';
 
 const VoterLogin = () => {
+  const { projectId, voterId } = useParams<{ projectId: string; voterId: string }>();
   const navigate = useNavigate();
-  const { projectId } = useParams();
-  const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
-  const [showOtpInput, setShowOtpInput] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [sendingOtp, setSendingOtp] = useState(false);
-  const [projectName, setProjectName] = useState("");
-  
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [voter, setVoter] = useState<any>(null);
+
   useEffect(() => {
-    const fetchProjectName = async () => {
-      if (!projectId) return;
-      
+    const loadVoter = async () => {
+      if (!projectId || !voterId) {
+        toast.error("Project or Voter ID is missing");
+        return;
+      }
+
       try {
-        const { data, error } = await supabase
-          .from('projects')
-          .select('title')
-          .eq('id', projectId)
+        const { data: voterData, error: voterError } = await supabase
+          .from('voters')
+          .select('*, projects(title)')
+          .eq('id', voterId)
+          .eq('project_id', projectId)
           .single();
-          
-        if (error) throw error;
-        
-        if (data) {
-          setProjectName(data.title);
+
+        if (voterError) throw voterError;
+
+        if (!voterData) {
+          toast.error("Voter not found");
+          return;
         }
+
+        setVoter(voterData);
       } catch (error: any) {
-        console.error("Error fetching project:", error.message);
-        toast({
-          title: "Error",
-          description: "Failed to load project information",
-        });
+        console.error("Error loading voter:", error.message);
+        toast.error("Failed to load voter information");
       }
     };
-    
-    fetchProjectName();
-  }, [projectId]);
-  
-  const handleSendOTP = async () => {
-    if (!email) {
-      toast({
-        title: "Error",
-        description: "Please enter your email address",
-        variant: "destructive"
-      });
-      return;
-    }
-    
+
+    loadVoter();
+  }, [projectId, voterId]);
+
+  // Update the sendOtp function to use our new email service
+  const sendOtp = async () => {
     try {
-      setSendingOtp(true);
+      setIsSendingOtp(true);
       
-      // Check if voter exists with given email
-      const { data: voterData, error: voterError } = await supabase
-        .from('voters')
-        .select('*')
-        .eq('email', email)
-        .eq('project_id', projectId)
-        .single();
-        
-      if (voterError) {
-        if (voterError.message.includes('No rows found')) {
-          throw new Error('No voter found with this email address');
-        }
-        throw voterError;
+      if (!voter) {
+        toast.error("Voter information not found");
+        return;
       }
       
-      // Generate a 6-digit OTP
+      // Generate OTP (6 digits)
       const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
       
-      // Store OTP in the database with expiration time (15 mins)
+      // Set expiration time (15 minutes from now)
       const expiresAt = new Date();
       expiresAt.setMinutes(expiresAt.getMinutes() + 15);
       
-      // Store the OTP in the voter_otps table
+      // Call the create_voter_otp function
       const { error: otpError } = await supabase.rpc('create_voter_otp', {
-        v_voter_id: voterData.id,
-        v_email: email,
+        v_voter_id: voter.id,
+        v_email: voter.email,
         v_otp: generatedOtp,
         v_expires_at: expiresAt.toISOString()
       });
       
       if (otpError) throw otpError;
       
-      console.log("Generated OTP:", generatedOtp);
-      
-      // Prepare the voting link - this will be used in the email
-      const votingLink = `${window.location.origin}/projects/${projectId}/voter-login`;
-      
-      // Send OTP via email using our edge function
-      const { error: functionError } = await supabase.functions.invoke('send-voter-otp', {
-        body: { 
-          email: email,
-          otp: generatedOtp,
-          voterName: voterData.name,
-          projectName: projectName,
-          votingLink: votingLink
+      // Send email with OTP using our new email service
+      const { success, error } = await sendEmail(
+        voter.email,
+        `Your OTP for ${voter.project?.title || 'Meeting'} - ${generatedOtp}`,
+        'voterOtp',
+        {
+          recipientName: voter.name || 'Voter',
+          projectName: voter.project?.title || 'Meeting',
+          otp: generatedOtp
         }
-      });
+      );
       
-      if (functionError) {
-        console.error("Edge function error:", functionError);
-        throw functionError;
+      if (!success) {
+        throw new Error(error || "Failed to send email");
       }
       
-      setShowOtpInput(true);
-      toast({
-        title: "OTP Sent",
-        description: "A one-time password has been sent to your email"
-      });
+      toast.success(`OTP sent to ${voter.email}`);
+      setOtpSent(true);
       
     } catch (error: any) {
-      console.error("Error sending OTP:", error.message);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to send OTP. Please try again.",
-        variant: "destructive"
-      });
+      console.error("Error sending OTP:", error);
+      toast.error(`Failed to send OTP: ${error.message}`);
     } finally {
-      setSendingOtp(false);
+      setIsSendingOtp(false);
     }
-  };
-  
-  const handleVerifyOTP = async () => {
-    if (!email || !otp) {
-      toast({
-        title: "Error",
-        description: "Please enter your email and OTP",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    try {
-      setLoading(true);
-      
-      // Check if voter exists
-      const { data: voterData, error: voterError } = await supabase
-        .from('voters')
-        .select('*')
-        .eq('email', email)
-        .eq('project_id', projectId)
-        .single();
-        
-      if (voterError) throw voterError;
-      
-      // Verify OTP
-      const { data: otpData, error: otpError } = await supabase.rpc('verify_voter_otp', {
-        v_voter_id: voterData.id,
-        v_otp: otp
-      });
-        
-      if (otpError) {
-        throw new Error('Invalid or expired OTP. Please request a new one.');
-      }
-      
-      if (!otpData) {
-        throw new Error('Invalid or expired OTP. Please request a new one.');
-      }
-      
-      // Store voter info in session storage
-      sessionStorage.setItem('voter', JSON.stringify({
-        id: voterData.id,
-        email: voterData.email,
-        name: voterData.name,
-        project_id: voterData.project_id,
-        company_name: voterData.company_name,
-        voting_weight: voterData.voting_weight
-      }));
-      
-      // Update voter status to active
-      await supabase
-        .from('voters')
-        .update({ status: 'active' })
-        .eq('id', voterData.id);
-      
-      // Redirect to voter dashboard
-      navigate(`/projects/${projectId}/voter-dashboard`);
-      
-      toast({
-        title: "Success",
-        description: "Login successful!"
-      });
-      
-    } catch (error: any) {
-      console.error("Login error:", error.message);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to login. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  const handleGoBack = () => {
-    navigate('/');
   };
 
+  const verifyOtp = async (voterId: string, otp: string): Promise<boolean> => {
+    try {
+      const { data, error } = await supabase
+        .from('voter_otps')
+        .select('*')
+        .eq('voter_id', voterId)
+        .eq('otp', otp)
+        .gt('expires_at', new Date().toISOString());
+
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error("Error verifying OTP:", error);
+      return false;
+    }
+  };
+
+  const handleSubmit = async () => {
+    setIsSubmitting(true);
+
+    try {
+      if (!voter) {
+        toast.error("Voter information not found");
+        return;
+      }
+
+      const isValidOtp = await verifyOtp(voter.id, otp);
+
+      if (!isValidOtp) {
+        toast.error("Invalid OTP. Please try again.");
+        return;
+      }
+
+      // Store voter info in local storage
+      localStorage.setItem('voter', JSON.stringify(voter));
+
+      // Redirect to the voting page
+      navigate(`/projects/${projectId}/meeting`);
+    } catch (error: any) {
+      console.error("Error during login:", error.message);
+      toast.error("Failed to login. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
+  // Update the UI to show OTP input once it's sent
+  if (!voter) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+        <div className="w-full max-w-md">
+          <div className="text-center mb-6">
+            <Loader2 className="mx-auto h-8 w-8 animate-spin text-gray-400" />
+            <h2 className="mt-4 text-xl font-semibold">Loading voter information...</h2>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-evoting-50 to-evoting-100 flex items-center justify-center p-4"
-         style={{
-           backgroundImage: "url('https://images.unsplash.com/photo-1541435469116-8ce8ccc4ff85?q=80&w=1976&auto=format&fit=crop&ixlib=rb-4.0.3')",
-           backgroundSize: "cover",
-           backgroundPosition: "center"
-         }}>
-      <div className="absolute inset-0 bg-black bg-opacity-50 backdrop-blur-sm"></div>
-      
-      <Card className="w-full max-w-md shadow-xl border-0 relative">
-        <CardHeader className="space-y-1 pb-4 text-center">
-          <CardTitle className="text-2xl font-bold text-evoting-800">Voter Login</CardTitle>
-          <CardDescription>
-            {projectName ? `Enter your credentials for ${projectName}` : 'Enter your voter credentials'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label htmlFor="email" className="text-sm font-medium text-gray-700">Email</label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 h-4 w-4" />
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="Enter your email"
-                  className="pl-10"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-            
-            <div className="flex justify-end">
-              <Button
-                type="button"
-                variant={showOtpInput ? "outline" : "default"}
-                className={`w-full ${showOtpInput ? "bg-gray-100 hover:bg-gray-200 text-gray-700" : "bg-evoting-600 hover:bg-evoting-700 text-white"}`}
-                onClick={handleSendOTP}
-                disabled={sendingOtp || !email}
-              >
-                {sendingOtp ? (
-                  <>
-                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                    Sending...
-                  </>
-                ) : showOtpInput ? (
-                  <>
-                    <RefreshCw className="mr-2 h-4 w-4" />
-                    Resend OTP
-                  </>
-                ) : (
-                  <>
-                    <Send className="mr-2 h-4 w-4" />
-                    Send OTP
-                  </>
-                )}
-              </Button>
-            </div>
-            
-            {showOtpInput && (
-              <div className="space-y-4 pt-4 border-t border-gray-100">
-                <div className="space-y-2">
-                  <label htmlFor="otp" className="text-sm font-medium text-gray-700">One-Time Password</label>
-                  <div className="flex justify-center">
-                    <InputOTP maxLength={6} value={otp} onChange={setOtp}>
-                      <InputOTPGroup>
-                        <InputOTPSlot index={0} className="h-12 w-12" />
-                        <InputOTPSlot index={1} className="h-12 w-12" />
-                        <InputOTPSlot index={2} className="h-12 w-12" />
-                        <InputOTPSlot index={3} className="h-12 w-12" />
-                        <InputOTPSlot index={4} className="h-12 w-12" />
-                        <InputOTPSlot index={5} className="h-12 w-12" />
-                      </InputOTPGroup>
-                    </InputOTP>
-                  </div>
-                </div>
-                
-                <Button
-                  type="button"
-                  className="w-full bg-evoting-600 hover:bg-evoting-700 text-white"
-                  onClick={handleVerifyOTP}
-                  disabled={loading || otp.length !== 6}
-                >
-                  {loading ? "Verifying..." : "Verify & Login"}
-                </Button>
-              </div>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+      <div className="w-full max-w-md">
+        <div className="bg-white p-8 rounded-lg shadow-md">
+          <div className="text-center mb-6">
+            <h1 className="text-2xl font-bold">Voter Login</h1>
+            {voter.project && (
+              <p className="text-gray-600 mt-1">{voter.project.title}</p>
             )}
           </div>
           
-          <div className="mt-4 pt-4 border-t border-gray-100 text-center">
-            <p className="text-sm text-gray-600">
-              <HelpCircle className="inline-block mr-1 h-4 w-4" />
-              Having trouble logging in? Contact your meeting administrator
-            </p>
-            <Button
-              variant="ghost"
-              className="mt-2 text-evoting-600"
-              onClick={handleGoBack}
-            >
-              Back to Home
-            </Button>
+          <div className="space-y-6">
+            <div>
+              <Label className="block text-sm font-medium mb-1">Email</Label>
+              <Input type="email" value={voter.email} readOnly disabled />
+            </div>
+            
+            {!otpSent ? (
+              <Button 
+                className="w-full" 
+                onClick={sendOtp}
+                disabled={isSendingOtp}
+              >
+                {isSendingOtp ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Sending OTP...
+                  </>
+                ) : (
+                  "Send OTP to Email"
+                )}
+              </Button>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="otp" className="block text-sm font-medium">One-Time Password</Label>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-auto p-0 text-xs text-blue-600 hover:text-blue-800" 
+                      onClick={sendOtp}
+                      disabled={isSendingOtp}
+                    >
+                      {isSendingOtp ? "Sending..." : "Resend OTP"}
+                    </Button>
+                  </div>
+                  
+                  <div className="flex justify-center py-4">
+                    <InputOTP 
+                      maxLength={6} 
+                      value={otp} 
+                      onChange={setOtp}
+                      disabled={isSubmitting}
+                    >
+                      <InputOTPGroup>
+                        <InputOTPSlot index={0} />
+                        <InputOTPSlot index={1} />
+                        <InputOTPSlot index={2} />
+                        <InputOTPSlot index={3} />
+                        <InputOTPSlot index={4} />
+                        <InputOTPSlot index={5} />
+                      </InputOTPGroup>
+                    </InputOTP>
+                  </div>
+                  
+                  <Button 
+                    className="w-full" 
+                    onClick={handleSubmit}
+                    disabled={otp.length !== 6 || isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Verifying...
+                      </>
+                    ) : (
+                      "Verify & Login"
+                    )}
+                  </Button>
+                </div>
+                
+                <div className="text-center text-sm text-gray-500 mt-4">
+                  <p>OTP has been sent to your email address.</p>
+                  <p>Please check your inbox and spam folder.</p>
+                </div>
+              </>
+            )}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 };

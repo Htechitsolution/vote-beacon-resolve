@@ -1,7 +1,14 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
-import Navigation from "@/components/layout/Navigation";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -10,778 +17,647 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
+import { PlusCircle, Download, Trash2, Edit, Mail, MailCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { X, Search, Users, Percent, Trash2, Download, Upload, Mail, MailCheck } from "lucide-react";
+import { toast } from "sonner";
+import Navigation from "@/components/layout/Navigation";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Separator } from "@/components/ui/separator";
+import { useToast } from "@/components/ui/use-toast";
 import {
   Breadcrumb,
   BreadcrumbItem,
+  BreadcrumbLink,
   BreadcrumbList,
+  BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import * as z from "zod";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-
-interface Voter {
-  id: string;
-  name: string;
-  email: string;
-  company_name?: string | null;
-  voting_weight: number;
-  status: string;
-}
-
-interface Project {
-  id: string;
-  title: string;
-}
-
-interface Agenda {
-  id: string;
-  title: string;
-  status: string;
-}
-
-const voterSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters"),
-  email: z.string().email("Invalid email address"),
-  company_name: z.string().optional(),
-  voting_weight: z.coerce.number()
-    .min(0.01, "Voting weight must be greater than 0")
-    .max(100, "Voting weight cannot exceed 100%"),
-});
-
-type VoterFormValues = z.infer<typeof voterSchema>;
+import { sendEmail } from "@/lib/emailUtils";
 
 const VoterManagement = () => {
-  const { projectId, agendaId } = useParams<{ projectId: string, agendaId: string }>();
-  const { profile } = useAuth();
-  const [voters, setVoters] = useState<Voter[]>([]);
-  const [project, setProject] = useState<Project | null>(null);
-  const [agenda, setAgenda] = useState<Agenda | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [totalWeight, setTotalWeight] = useState(0);
-  const [uniqueCompanies, setUniqueCompanies] = useState<Map<string, number>>(new Map());
-  const [sendingEmails, setSendingEmails] = useState<Record<string, boolean>>({});
-  const [sendingAllEmails, setSendingAllEmails] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const form = useForm<VoterFormValues>({
-    resolver: zodResolver(voterSchema),
-    defaultValues: {
-      name: "",
-      email: "",
-      company_name: "",
-      voting_weight: 1,
-    },
-  });
+  const { projectId } = useParams<{ projectId: string }>();
+  const [voters, setVoters] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isAddVoterDialogOpen, setIsAddVoterDialogOpen] = useState(false);
+  const [isEditVoterDialogOpen, setIsEditVoterDialogOpen] = useState(false);
+  const [newVoterName, setNewVoterName] = useState("");
+  const [newVoterEmail, setNewVoterEmail] = useState("");
+  const [newVoterCompany, setNewVoterCompany] = useState("");
+  const [editingVoter, setEditingVoter] = useState<any>(null);
+  const [project, setProject] = useState<any>(null);
+  const { user, profile } = useAuth();
+  const [sendingBulkEmails, setSendingBulkEmails] = useState(false);
+  const [sendingSingleEmail, setSendingSingleEmail] = useState<string | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (projectId) {
-      fetchProjectDetails();
-      fetchVoters();
-      if (agendaId) {
-        fetchAgendaDetails();
+      fetchData();
+    }
+  }, [projectId]);
+
+  const fetchData = async () => {
+    try {
+      setIsLoading(true);
+
+      // Fetch project details
+      const { data: projectData, error: projectError } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('id', projectId)
+        .single();
+
+      if (projectError) {
+        throw projectError;
       }
-    }
-  }, [projectId, agendaId]);
 
-  useEffect(() => {
-    calculateTotalWeight();
-  }, [voters]);
+      setProject(projectData);
 
-  const fetchProjectDetails = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("projects")
-        .select("id, title")
-        .eq("id", projectId)
-        .single();
+      // Fetch voters for the project
+      const { data: votersData, error: votersError } = await supabase
+        .from('voters')
+        .select('*')
+        .eq('project_id', projectId);
 
-      if (error) throw error;
-      setProject(data);
+      if (votersError) {
+        throw votersError;
+      }
+
+      setVoters(votersData || []);
     } catch (error: any) {
-      console.error("Error fetching project:", error.message);
-      toast.error("Failed to load project details");
-    }
-  };
-
-  const fetchAgendaDetails = async () => {
-    if (!agendaId) return;
-    
-    try {
-      const { data, error } = await supabase
-        .from("agendas")
-        .select("id, title, status")
-        .eq("id", agendaId)
-        .single();
-
-      if (error) throw error;
-      setAgenda(data);
-    } catch (error: any) {
-      console.error("Error fetching agenda:", error.message);
-      toast.error("Failed to load agenda details");
-    }
-  };
-
-  const fetchVoters = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from("voters")
-        .select("*")
-        .eq("project_id", projectId);
-
-      if (error) throw error;
-      setVoters(data || []);
-    } catch (error: any) {
-      console.error("Error fetching voters:", error.message);
-      toast.error("Failed to load voters");
+      console.error("Error fetching data:", error.message);
+      toast({
+        title: "Error",
+        description: "Failed to load voters",
+        variant: "destructive"
+      });
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  const calculateTotalWeight = () => {
-    // Create a map to track companies and their voting weights
-    const companies = new Map<string, number>();
-    let total = 0;
-
-    voters.forEach(voter => {
-      const company = voter.company_name || voter.email;
-      
-      // If this company is already counted, don't add to total
-      if (!companies.has(company)) {
-        companies.set(company, voter.voting_weight);
-        total += voter.voting_weight;
-      }
-    });
-
-    setUniqueCompanies(companies);
-    setTotalWeight(total);
+  const openAddVoterDialog = () => {
+    setIsAddVoterDialogOpen(true);
+    setNewVoterName("");
+    setNewVoterEmail("");
+    setNewVoterCompany("");
   };
 
-  const addVoter = async (data: VoterFormValues) => {
+  const closeAddVoterDialog = () => {
+    setIsAddVoterDialogOpen(false);
+  };
+
+  const handleAddVoter = async () => {
     try {
-      // Check if adding this voter would exceed 100%
-      let newTotal = totalWeight;
-      const company = data.company_name || data.email;
-      
-      // Only add to total if company is new
-      if (!uniqueCompanies.has(company)) {
-        newTotal += data.voting_weight;
-      }
-      
-      if (newTotal > 100) {
-        toast.error("Total voting weight cannot exceed 100%");
+      if (!newVoterName || !newVoterEmail) {
+        toast({
+          title: "Error",
+          description: "Please fill in all fields",
+          variant: "destructive"
+        });
         return;
       }
 
-      // Check if voter with the same email already exists for this project
-      const { data: existingVoters, error: checkError } = await supabase
-        .from("voters")
-        .select("id")
-        .eq("project_id", projectId)
-        .eq("email", data.email);
-
-      if (checkError) throw checkError;
-
-      if (existingVoters && existingVoters.length > 0) {
-        toast.error("A voter with this email already exists for this project");
+      if (!projectId) {
+        toast({
+          title: "Error",
+          description: "Project ID is missing",
+          variant: "destructive"
+        });
         return;
       }
 
-      const { error } = await supabase.from("voters").insert([
-        {
-          project_id: projectId,
-          name: data.name,
-          email: data.email,
-          company_name: data.company_name || null,
-          voting_weight: data.voting_weight,
-          status: "pending",
-        },
-      ]);
+      const { data, error } = await supabase
+        .from('voters')
+        .insert([
+          {
+            name: newVoterName,
+            email: newVoterEmail,
+            company_name: newVoterCompany,
+            project_id: projectId,
+            status: 'active'
+          },
+        ])
+        .select('*');
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
 
-      toast.success("Voter added successfully");
-      form.reset();
-      fetchVoters();
+      setVoters([...voters, ...(data || [])]);
+      closeAddVoterDialog();
+      toast({
+        title: "Success",
+        description: "Voter added successfully!"
+      });
     } catch (error: any) {
       console.error("Error adding voter:", error.message);
-      toast.error(error.message);
+      toast({
+        title: "Error",
+        description: "Failed to add voter: " + error.message,
+        variant: "destructive"
+      });
     }
   };
 
-  const deleteVoter = async (id: string) => {
+  const handleEditVoter = (voter: any) => {
+    setEditingVoter(voter);
+    setIsEditVoterDialogOpen(true);
+  };
+
+  const closeEditVoterDialog = () => {
+    setIsEditVoterDialogOpen(false);
+    setEditingVoter(null);
+  };
+
+  const handleUpdateVoter = async (updatedVoter: any) => {
+    try {
+      if (!updatedVoter.name || !updatedVoter.email) {
+        toast({
+          title: "Error",
+          description: "Please fill in all fields",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('voters')
+        .update({
+          name: updatedVoter.name,
+          email: updatedVoter.email,
+          company_name: updatedVoter.company_name,
+          voting_weight: updatedVoter.voting_weight
+        })
+        .eq('id', updatedVoter.id)
+        .select('*');
+
+      if (error) {
+        throw error;
+      }
+
+      setVoters(voters.map(voter => (voter.id === updatedVoter.id ? (data && data[0] ? data[0] : voter) : voter)));
+      closeEditVoterDialog();
+      toast({
+        title: "Success",
+        description: "Voter updated successfully!"
+      });
+    } catch (error: any) {
+      console.error("Error updating voter:", error.message);
+      toast({
+        title: "Error",
+        description: "Failed to update voter: " + error.message,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDeleteVoter = async (voterId: string) => {
     try {
       const { error } = await supabase
-        .from("voters")
+        .from('voters')
         .delete()
-        .eq("id", id);
+        .eq('id', voterId);
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
 
-      toast.success("Voter removed successfully");
-      fetchVoters();
+      setVoters(voters.filter(voter => voter.id !== voterId));
+      toast({
+        title: "Success",
+        description: "Voter deleted successfully!"
+      });
     } catch (error: any) {
-      console.error("Error removing voter:", error.message);
-      toast.error(error.message);
+      console.error("Error deleting voter:", error.message);
+      toast({
+        title: "Error",
+        description: "Failed to delete voter: " + error.message,
+        variant: "destructive"
+      });
     }
   };
 
-  const sendVotingLinkEmail = async (voter: Voter) => {
+  const handleExportCsv = () => {
+    const csvRows = [];
+    const headers = Object.keys(voters[0] || {}).join(',');
+    csvRows.push(headers);
+
+    for (const voter of voters) {
+      const values = Object.values(voter).map(value => `"${value}"`).join(',');
+      csvRows.push(values);
+    }
+
+    const csvData = csvRows.join('\n');
+    const blob = new Blob([csvData], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.setAttribute('href', url);
+    a.setAttribute('download', 'voters.csv');
+    a.click();
+  };
+  
+  const generateOTP = (): string => {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+  };
+  
+  const createVoterOTP = async (voterId: string, email: string): Promise<string> => {
     try {
-      setSendingEmails(prev => ({ ...prev, [voter.id]: true }));
+      const otp = generateOTP();
       
-      // Generate a 6-digit OTP
-      const otp = Math.floor(100000 + Math.random() * 900000).toString();
-      
-      // Store OTP in the database with expiration time (15 mins)
       const expiresAt = new Date();
       expiresAt.setMinutes(expiresAt.getMinutes() + 15);
       
-      // Store the OTP in the voter_otps table
-      const { error: otpError } = await supabase.rpc('create_voter_otp', {
-        v_voter_id: voter.id,
-        v_email: voter.email,
+      const { data, error } = await supabase.rpc('create_voter_otp', {
+        v_voter_id: voterId,
+        v_email: email,
         v_otp: otp,
         v_expires_at: expiresAt.toISOString()
       });
       
-      if (otpError) throw otpError;
+      if (error) throw error;
+      return otp;
+    } catch (error) {
+      console.error("Error creating OTP:", error);
+      throw error;
+    }
+  };
+  
+  const sendVotingLink = async (voter: any) => {
+    try {
+      setSendingSingleEmail(voter.id);
       
-      // Prepare the voting link - this will be a deep link that can be used to access the voting page
-      const votingLink = `${window.location.origin}/projects/${projectId}/voter-login`;
+      const otp = await createVoterOTP(voter.id, voter.email);
       
-      // Send OTP via email using our edge function
-      const { error: functionError } = await supabase.functions.invoke('send-voter-otp', {
-        body: { 
-          email: voter.email,
-          otp: otp,
-          voterName: voter.name,
-          projectName: project?.title || "Meeting",
-          votingLink: votingLink
+      const baseUrl = window.location.origin;
+      const votingLink = `${baseUrl}/voter-meeting/${projectId}/${voter.id}`;
+      
+      const result = await sendEmail(
+        voter.email,
+        `Your Voting Link and OTP for ${project?.title || 'Meeting'} - ${otp}`,
+        'votingLink',
+        {
+          recipientName: voter.name || 'Voter',
+          projectName: project?.title || 'Meeting',
+          votingLink,
+          otp
         }
-      });
+      );
       
-      if (functionError) throw functionError;
-      
-      toast.success(`Voting link sent to ${voter.email}`);
+      if (result.success) {
+        toast({
+          title: "Success",
+          description: `Voting link sent to ${voter.email}`
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: `Failed to send voting link: ${result.error}`,
+          variant: "destructive"
+        });
+      }
     } catch (error: any) {
-      console.error("Error sending voting link:", error.message);
-      toast.error(`Failed to send voting link: ${error.message}`);
+      console.error("Error sending voting link:", error);
+      toast({
+        title: "Error",
+        description: `Failed to send voting link: ${error.message}`,
+        variant: "destructive"
+      });
     } finally {
-      setSendingEmails(prev => ({ ...prev, [voter.id]: false }));
+      setSendingSingleEmail(null);
     }
   };
   
   const sendAllVotingLinks = async () => {
     try {
-      setSendingAllEmails(true);
+      setSendingBulkEmails(true);
+      
+      if (!voters.length) {
+        toast({
+          title: "Error",
+          description: "No voters to send emails to",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      toast({
+        title: "Info",
+        description: `Preparing to send voting links to ${voters.length} voters...`
+      });
+      
       let successCount = 0;
       let errorCount = 0;
       
       for (const voter of voters) {
         try {
-          // Generate a 6-digit OTP
-          const otp = Math.floor(100000 + Math.random() * 900000).toString();
+          const otp = await createVoterOTP(voter.id, voter.email);
           
-          // Store OTP in the database with expiration time (15 mins)
-          const expiresAt = new Date();
-          expiresAt.setMinutes(expiresAt.getMinutes() + 15);
+          const baseUrl = window.location.origin;
+          const votingLink = `${baseUrl}/voter-meeting/${projectId}/${voter.id}`;
           
-          // Store the OTP in the voter_otps table
-          const { error: otpError } = await supabase.rpc('create_voter_otp', {
-            v_voter_id: voter.id,
-            v_email: voter.email,
-            v_otp: otp,
-            v_expires_at: expiresAt.toISOString()
-          });
-          
-          if (otpError) throw otpError;
-          
-          // Prepare the voting link
-          const votingLink = `${window.location.origin}/projects/${projectId}/voter-login`;
-          
-          // Send OTP via email using our edge function
-          const { error: functionError } = await supabase.functions.invoke('send-voter-otp', {
-            body: { 
-              email: voter.email,
-              otp: otp,
-              voterName: voter.name,
-              projectName: project?.title || "Meeting",
-              votingLink: votingLink
+          const result = await sendEmail(
+            voter.email,
+            `Your Voting Link and OTP for ${project?.title || 'Meeting'} - ${otp}`,
+            'votingLink',
+            {
+              recipientName: voter.name || 'Voter',
+              projectName: project?.title || 'Meeting',
+              votingLink,
+              otp
             }
-          });
+          );
           
-          if (functionError) throw functionError;
+          if (result.success) {
+            successCount++;
+          } else {
+            errorCount++;
+            console.error(`Failed to send to ${voter.email}:`, result.error);
+          }
           
-          successCount++;
+          await new Promise(resolve => setTimeout(resolve, 100));
         } catch (error) {
-          console.error(`Failed to send to ${voter.email}:`, error);
+          console.error(`Failed to process voter ${voter.email}:`, error);
           errorCount++;
         }
-        
-        // Add a small delay between emails to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 100));
       }
       
       if (errorCount === 0) {
-        toast.success(`Successfully sent voting links to all ${successCount} voters`);
+        toast({
+          title: "Success",
+          description: `Successfully sent voting links to all ${successCount} voters`
+        });
       } else {
-        toast.warning(`Sent ${successCount} emails, but ${errorCount} failed. Check console for details.`);
+        toast({
+          title: "Warning",
+          description: `Sent ${successCount} emails, but ${errorCount} failed.`,
+          variant: "warning"
+        });
       }
     } catch (error: any) {
-      console.error("Error sending voting links:", error.message);
-      toast.error("Failed to send voting links");
+      console.error("Error sending voting links:", error);
+      toast({
+        title: "Error",
+        description: `Failed to send voting links: ${error.message}`,
+        variant: "destructive"
+      });
     } finally {
-      setSendingAllEmails(false);
+      setSendingBulkEmails(false);
     }
   };
-
-  const downloadVoterTemplate = () => {
-    // Create CSV template
-    const headers = "Name,Email,Company,Voting Weight\n";
-    const example = "John Doe,john@example.com,ACME Inc,1\n";
-    const csvContent = headers + example;
-    
-    // Create a blob and download
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    
-    link.setAttribute("href", url);
-    link.setAttribute("download", "voters_template.csv");
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      try {
-        const csvData = event.target?.result as string;
-        const lines = csvData.split("\n");
-        
-        // Remove header row
-        lines.shift();
-        
-        const votersToAdd = [];
-        
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          
-          const [name, email, company, weightStr] = line.split(",");
-          const weight = parseFloat(weightStr) || 1;
-          
-          if (name && email) {
-            votersToAdd.push({
-              project_id: projectId,
-              name: name.trim(),
-              email: email.trim(),
-              company_name: company ? company.trim() : null,
-              voting_weight: weight,
-              status: "pending",
-            });
-          }
-        }
-        
-        if (votersToAdd.length === 0) {
-          toast.error("No valid voters found in the file");
-          return;
-        }
-        
-        // Add voters to database
-        const { data, error } = await supabase
-          .from("voters")
-          .insert(votersToAdd);
-          
-        if (error) {
-          if (error.message.includes("duplicate key")) {
-            toast.error("Some voters could not be added due to duplicate emails");
-          } else {
-            throw error;
-          }
-        } else {
-          toast.success(`${votersToAdd.length} voters added successfully`);
-          fetchVoters();
-        }
-      } catch (error: any) {
-        console.error("Error uploading voters:", error.message);
-        toast.error("Failed to process the uploaded file");
-      }
-      
-      // Reset file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    };
-    
-    reader.readAsText(file);
-  };
-
-  const downloadVotersList = () => {
-    // Create CSV with all voters
-    let csvContent = "Name,Email,Company,Voting Weight,Status\n";
-    
-    voters.forEach(voter => {
-      const row = [
-        voter.name,
-        voter.email,
-        voter.company_name || "",
-        voter.voting_weight,
-        voter.status
-      ].join(",");
-      csvContent += row + "\n";
-    });
-    
-    // Create a blob and download
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    
-    link.setAttribute("href", url);
-    link.setAttribute("download", `voters_${project?.title || "project"}.csv`);
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const filteredVoters = voters.filter((voter) =>
-    voter.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    voter.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    voter.company_name?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const isVotingClosed = agenda?.status === "closed";
-
+  
   return (
     <div>
       <Navigation />
       
-      <div className="container mx-auto px-4 py-6 max-w-6xl">
+      <div className="container mx-auto px-4 py-8">
         <Breadcrumb className="mb-4">
           <BreadcrumbList>
             <BreadcrumbItem>
-              <Link to="/">Home</Link>
+              <BreadcrumbLink>
+                <Link to="/">Home</Link>
+              </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
-              <Link to="/projects">Projects</Link>
+              <BreadcrumbLink>
+                <Link to="/projects">Projects</Link>
+              </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
-              <Link to={`/projects/${projectId}`}>{project?.title || "Project"}</Link>
-            </BreadcrumbItem>
-            {agenda && (
-              <>
-                <BreadcrumbSeparator />
-                <BreadcrumbItem>
-                  <Link to={`/projects/${projectId}/agenda/${agendaId}`}>{agenda.title}</Link>
-                </BreadcrumbItem>
-              </>
-            )}
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              Manage Voters
+              <BreadcrumbPage>{project?.title || 'Manage Voters'}</BreadcrumbPage>
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
-
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold mb-1">Manage Voters</h1>
-            <p className="text-gray-600">
-              Add and manage voters for {agenda ? `agenda: ${agenda.title}` : `project: ${project?.title}`}
-            </p>
-          </div>
-        </div>
-
-        <div className="mb-8">
-          <Card className="w-full">
-            <CardHeader>
-              <CardTitle className="text-lg">Registration Summary</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="bg-blue-50 p-4 rounded-lg flex items-center gap-3">
-                  <Users className="h-8 w-8 text-blue-500" />
-                  <div>
-                    <p className="text-sm text-gray-500">Total Voters</p>
-                    <p className="text-xl font-semibold">{voters.length}</p>
-                  </div>
-                </div>
-                
-                <div className="bg-green-50 p-4 rounded-lg flex items-center gap-3">
-                  <Percent className="h-8 w-8 text-green-500" />
-                  <div>
-                    <p className="text-sm text-gray-500">Total Weight</p>
-                    <p className="text-xl font-semibold">{totalWeight}%</p>
-                  </div>
-                </div>
-                
-                <div className="bg-purple-50 p-4 rounded-lg flex items-center gap-3">
-                  <Users className="h-8 w-8 text-purple-500" />
-                  <div>
-                    <p className="text-sm text-gray-500">Unique Companies</p>
-                    <p className="text-xl font-semibold">{uniqueCompanies.size}</p>
-                  </div>
-                </div>
-              </div>
-              
-              {!isVotingClosed && (
-                <div className="mt-6 pt-6 border-t border-gray-200">
-                  <h3 className="font-medium text-lg mb-4">Add New Voter</h3>
-                  
-                  <Form {...form}>
-                    <form onSubmit={form.handleSubmit(addVoter)} className="flex flex-wrap gap-4">
-                      <div className="flex-1 min-w-[200px]">
-                        <FormField
-                          control={form.control}
-                          name="name"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Name</FormLabel>
-                              <FormControl>
-                                <Input placeholder="Voter name" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-                      
-                      <div className="flex-1 min-w-[200px]">
-                        <FormField
-                          control={form.control}
-                          name="email"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Email</FormLabel>
-                              <FormControl>
-                                <Input placeholder="Email address" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-                      
-                      <div className="flex-1 min-w-[200px]">
-                        <FormField
-                          control={form.control}
-                          name="company_name"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Company Name</FormLabel>
-                              <FormControl>
-                                <Input placeholder="Company name (optional)" {...field} value={field.value || ""} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-                      
-                      <div className="w-[120px]">
-                        <FormField
-                          control={form.control}
-                          name="voting_weight"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Weight (%)</FormLabel>
-                              <FormControl>
-                                <Input 
-                                  type="number" 
-                                  min="0.01"
-                                  max="100"
-                                  step="0.01"
-                                  placeholder="1" 
-                                  {...field} 
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-                      
-                      <div className="flex items-end mb-1">
-                        <Button 
-                          type="submit" 
-                          className="bg-evoting-600 hover:bg-evoting-700"
-                        >
-                          Add Voter
-                        </Button>
-                      </div>
-                    </form>
-                  </Form>
-
-                  <div className="flex items-center gap-3 mt-5 border-t pt-4">
-                    <Button variant="outline" onClick={downloadVoterTemplate} className="flex items-center gap-2">
-                      <Download size={16} />
-                      Download Template
-                    </Button>
-                    
-                    <div className="relative">
-                      <input
-                        type="file"
-                        accept=".csv"
-                        ref={fileInputRef}
-                        onChange={handleFileUpload}
-                        className="hidden"
-                        id="csv-upload"
-                      />
-                      <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2">
-                        <Upload size={16} />
-                        Upload CSV
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold">Registered Voters</h2>
-          <div className="flex items-center gap-2">
-            <div className="relative w-64">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
-              <Input
-                placeholder="Search voters..."
-                className="pl-9"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
+        
+        <div className="mb-6 flex flex-wrap justify-between items-center gap-4">
+          <h1 className="text-2xl font-bold">{project?.title} - Manage Voters</h1>
+          
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={handleExportCsv} className="flex items-center gap-2">
+              <Download className="h-4 w-4" />
+              Export to CSV
+            </Button>
+            
             <Button 
               variant="outline" 
-              onClick={downloadVotersList}
+              onClick={sendAllVotingLinks} 
+              disabled={sendingBulkEmails || voters.length === 0}
               className="flex items-center gap-2"
-              disabled={voters.length === 0}
             >
-              <Download size={16} />
-              Export CSV
+              {sendingBulkEmails ? (
+                <>
+                  <span className="animate-spin h-4 w-4 border-b-2 rounded-full border-evoting-600"></span>
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Mail className="h-4 w-4" />
+                  Email Voting Links
+                </>
+              )}
             </Button>
-            <Button
-              variant="outline"
-              className="flex items-center gap-2"
-              onClick={sendAllVotingLinks}
-              disabled={voters.length === 0 || sendingAllEmails}
+            
+            <Button 
+              onClick={openAddVoterDialog}
+              className="bg-evoting-600 hover:bg-evoting-700 text-white flex items-center gap-2"
             >
-              <Mail size={16} />
-              {sendingAllEmails ? "Sending..." : "Email All Voting Links"}
+              <PlusCircle className="h-4 w-4" />
+              Add Voter
             </Button>
           </div>
         </div>
-
+        
         <Card>
-          <CardContent className="p-0">
-            {loading ? (
-              <div className="flex justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-evoting-600"></div>
+          <CardHeader>
+            <CardTitle>Registered Voters</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="flex justify-center py-20">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-evoting-600"></div>
               </div>
-            ) : filteredVoters.length > 0 ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Company</TableHead>
-                    <TableHead className="text-right">Weight (%)</TableHead>
-                    <TableHead className="text-right">Status</TableHead>
-                    <TableHead className="w-[160px]">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredVoters.map((voter) => (
-                    <TableRow key={voter.id}>
-                      <TableCell className="font-medium">{voter.name}</TableCell>
-                      <TableCell>{voter.email}</TableCell>
-                      <TableCell>{voter.company_name || "-"}</TableCell>
-                      <TableCell className="text-right">{voter.voting_weight}</TableCell>
-                      <TableCell className="text-right capitalize">{voter.status}</TableCell>
-                      <TableCell className="flex gap-2 items-center">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex items-center gap-1"
-                          onClick={() => sendVotingLinkEmail(voter)}
-                          disabled={sendingEmails[voter.id]}
-                          title="Send voting link"
-                        >
-                          {sendingEmails[voter.id] ? (
-                            <span className="flex items-center">
-                              <span className="animate-spin mr-1 h-4 w-4 border-b-2 rounded-full border-evoting-600"></span>
-                              Sending
-                            </span>
-                          ) : (
-                            <>
-                              <Mail className="h-3.5 w-3.5 text-evoting-600" />
-                              Link
-                            </>
-                          )}
-                        </Button>
-                        
-                        {!isVotingClosed && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => deleteVoter(voter.id)}
-                            title="Remove voter"
-                          >
-                            <Trash2 className="h-4 w-4 text-red-500" />
-                            <span className="sr-only">Delete</span>
-                          </Button>
-                        )}
-                      </TableCell>
+            ) : voters.length > 0 ? (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Company</TableHead>
+                      <TableHead>Weight</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {voters.map((voter) => (
+                      <TableRow key={voter.id}>
+                        <TableCell className="font-medium">{voter.name || '—'}</TableCell>
+                        <TableCell>{voter.email}</TableCell>
+                        <TableCell>{voter.company_name || '—'}</TableCell>
+                        <TableCell>{voter.voting_weight || '1'}</TableCell>
+                        <TableCell>
+                          <Badge variant={voter.status === 'voted' ? 'success' : voter.status === 'active' ? 'outline' : 'secondary'}>
+                            {voter.status === 'voted' ? 'Voted' : voter.status === 'active' ? 'Active' : 'Pending'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              onClick={() => sendVotingLink(voter)}
+                              disabled={!!sendingSingleEmail}
+                              className="h-8 w-8" 
+                              title="Send Voting Link"
+                            >
+                              {sendingSingleEmail === voter.id ? (
+                                <span className="animate-spin h-4 w-4 border-b-2 rounded-full border-evoting-600"></span>
+                              ) : (
+                                <MailCheck className="h-4 w-4 text-blue-500" />
+                              )}
+                            </Button>
+                            
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={() => handleEditVoter(voter)}
+                              className="h-8 w-8" 
+                              title="Edit Voter"
+                            >
+                              <Edit className="h-4 w-4 text-amber-500" />
+                            </Button>
+                            
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8" title="Delete Voter">
+                                  <Trash2 className="h-4 w-4 text-red-500" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This action cannot be undone. This will permanently delete the voter from our servers.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleDeleteVoter(voter.id)}>Delete</AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             ) : (
-              <div className="text-center py-8">
-                <p className="text-gray-500">No voters found. {searchTerm && "Try adjusting your search."}</p>
+              <div className="text-center py-12">
+                <h3 className="text-xl font-medium text-gray-600 mb-2">No voters found</h3>
+                <p className="text-gray-500 mb-6">Add your first voter to get started</p>
+                <Button onClick={openAddVoterDialog} className="bg-evoting-600 hover:bg-evoting-700 text-white">
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  Add New Voter
+                </Button>
               </div>
             )}
           </CardContent>
         </Card>
-
-        <div className="mt-6 flex justify-end">
-          <Button
-            variant="outline"
-            className="mr-2"
-            asChild
-          >
-            {agendaId ? (
-              <Link to={`/projects/${projectId}/agenda/${agendaId}`}>Back to Agenda</Link>
-            ) : (
-              <Link to={`/projects/${projectId}`}>Back to Project</Link>
+        
+        {/* Add Voter Dialog */}
+        <Dialog open={isAddVoterDialogOpen} onOpenChange={setIsAddVoterDialogOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Add New Voter</DialogTitle>
+              <DialogDescription>
+                Add a new voter to the project.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="name" className="text-right">Name</Label>
+                <Input id="name" value={newVoterName} onChange={(e) => setNewVoterName(e.target.value)} className="col-span-3" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="email" className="text-right">Email</Label>
+                <Input id="email" type="email" value={newVoterEmail} onChange={(e) => setNewVoterEmail(e.target.value)} className="col-span-3" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="company" className="text-right">Company</Label>
+                <Input id="company" value={newVoterCompany} onChange={(e) => setNewVoterCompany(e.target.value)} className="col-span-3" />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="secondary" onClick={closeAddVoterDialog}>
+                Cancel
+              </Button>
+              <Button type="submit" onClick={handleAddVoter}>Add Voter</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        
+        {/* Edit Voter Dialog */}
+        <Dialog open={isEditVoterDialogOpen} onOpenChange={setIsEditVoterDialogOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Edit Voter</DialogTitle>
+              <DialogDescription>
+                Update voter details.
+              </DialogDescription>
+            </DialogHeader>
+            {editingVoter && (
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="edit-name" className="text-right">Name</Label>
+                  <Input id="edit-name" value={editingVoter.name || ''} onChange={(e) => setEditingVoter({ ...editingVoter, name: e.target.value })} className="col-span-3" />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="edit-email" className="text-right">Email</Label>
+                  <Input id="edit-email" type="email" value={editingVoter.email || ''} onChange={(e) => setEditingVoter({ ...editingVoter, email: e.target.value })} className="col-span-3" />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="edit-company" className="text-right">Company</Label>
+                  <Input id="edit-company" value={editingVoter.company_name || ''} onChange={(e) => setEditingVoter({ ...editingVoter, company_name: e.target.value })} className="col-span-3" />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="edit-weight" className="text-right">Weight</Label>
+                  <Input id="edit-weight" type="number" value={editingVoter.voting_weight || 1} onChange={(e) => setEditingVoter({ ...editingVoter, voting_weight: parseInt(e.target.value) })} className="col-span-3" />
+                </div>
+              </div>
             )}
-          </Button>
-        </div>
+            <DialogFooter>
+              <Button type="button" variant="secondary" onClick={closeEditVoterDialog}>
+                Cancel
+              </Button>
+              <Button type="submit" onClick={() => handleUpdateVoter(editingVoter)}>Update Voter</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
