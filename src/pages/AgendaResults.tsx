@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileText, ArrowLeft, Download, Mail, FileExcel } from "lucide-react";
+import { FileText, ArrowLeft, Download, Mail, FileSpreadsheet } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -516,7 +516,7 @@ const AgendaResults = () => {
                   </>
                 ) : (
                   <>
-                    <FileExcel className="mr-1 h-4 w-4" />
+                    <FileSpreadsheet className="mr-1 h-4 w-4" />
                     Export Excel
                   </>
                 )}

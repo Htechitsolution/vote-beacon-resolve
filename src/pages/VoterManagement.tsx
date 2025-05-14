@@ -41,6 +41,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/components/ui/use-toast";
@@ -409,9 +410,9 @@ const VoterManagement = () => {
         });
       } else {
         toast({
-          title: "Warning",
+          title: "Error",
           description: `Sent ${successCount} emails, but ${errorCount} failed.`,
-          variant: "warning"
+          variant: "destructive"
         });
       }
     } catch (error: any) {

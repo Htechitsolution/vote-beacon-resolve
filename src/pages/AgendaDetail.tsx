@@ -175,7 +175,7 @@ const AgendaDetail = () => {
             status,
             start_date: startDate?.toISOString() || null,
             end_date: endDate?.toISOString() || null,
-            voting_type
+            voting_type: votingType
           })
           .eq('id', agendaId)
           .select();
@@ -194,7 +194,7 @@ const AgendaDetail = () => {
               status: 'draft',
               start_date: startDate?.toISOString() || null,
               end_date: endDate?.toISOString() || null,
-              voting_type
+              voting_type: votingType
             }
           ])
           .select();

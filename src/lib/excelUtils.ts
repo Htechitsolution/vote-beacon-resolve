@@ -48,12 +48,12 @@ export const exportToExcel = (data: ExcelExportData): void => {
     const rejectionPercent = 100 - approvalPercent;
     summaryData.push([
       result.option_title,
-      result.approve,
+      String(result.approve),
       `${approvalPercent.toFixed(2)}%`,
-      result.reject,
+      String(result.reject),
       `${rejectionPercent.toFixed(2)}%`,
-      result.abstain,
-      result.total_weight
+      String(result.abstain),
+      String(result.total_weight)
     ]);
   });
 
@@ -84,7 +84,7 @@ export const exportToExcel = (data: ExcelExportData): void => {
             : voter.vote_value === "reject" 
               ? "Reject" 
               : "Abstain",
-          voter.voting_weight
+          String(voter.voting_weight)
         ]);
       });
     } else {
