@@ -88,7 +88,7 @@ const VoterLogin = () => {
       const expiresAt = new Date();
       expiresAt.setMinutes(expiresAt.getMinutes() + 15);
       
-      // Store the OTP in the voter_otps table we created
+      // Store the OTP in the voter_otps table
       const { error: otpError } = await supabase.rpc('create_voter_otp', {
         v_voter_id: voterData.id,
         v_email: email,
@@ -98,17 +98,26 @@ const VoterLogin = () => {
       
       if (otpError) throw otpError;
       
+      console.log("Generated OTP:", generatedOtp);
+      
+      // Prepare the voting link - this will be used in the email
+      const votingLink = `${window.location.origin}/projects/${projectId}/voter-login`;
+      
       // Send OTP via email using our edge function
       const { error: functionError } = await supabase.functions.invoke('send-voter-otp', {
         body: { 
           email: email,
           otp: generatedOtp,
           voterName: voterData.name,
-          projectName: projectName
+          projectName: projectName,
+          votingLink: votingLink
         }
       });
       
-      if (functionError) throw functionError;
+      if (functionError) {
+        console.error("Edge function error:", functionError);
+        throw functionError;
+      }
       
       setShowOtpInput(true);
       toast({
