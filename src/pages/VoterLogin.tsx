@@ -12,14 +12,13 @@ import {
 } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
-import { HelpCircle, Mail, Key, Send, RefreshCw } from "lucide-react";
+import { HelpCircle, Mail, RefreshCw, Send } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 
 const VoterLogin = () => {
   const navigate = useNavigate();
   const { projectId } = useParams();
   const [email, setEmail] = useState("");
-  const [voterId, setVoterId] = useState("");
   const [otp, setOtp] = useState("");
   const [showOtpInput, setShowOtpInput] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -89,22 +88,18 @@ const VoterLogin = () => {
       const expiresAt = new Date();
       expiresAt.setMinutes(expiresAt.getMinutes() + 15);
       
-      const { error: otpError } = await supabase
-        .from('voter_otps')
-        .upsert([
-          {
-            voter_id: voterData.id,
-            email: email,
-            otp: generatedOtp,
-            expires_at: expiresAt.toISOString(),
-            used: false
-          }
-        ]);
-        
+      // Store the OTP in the voter_otps table we created
+      const { error: otpError } = await supabase.rpc('create_voter_otp', {
+        v_voter_id: voterData.id,
+        v_email: email,
+        v_otp: generatedOtp,
+        v_expires_at: expiresAt.toISOString()
+      });
+      
       if (otpError) throw otpError;
       
       // Send OTP via email using our edge function
-      await supabase.functions.invoke('send-voter-otp', {
+      const { error: functionError } = await supabase.functions.invoke('send-voter-otp', {
         body: { 
           email: email,
           otp: generatedOtp,
@@ -112,6 +107,8 @@ const VoterLogin = () => {
           projectName: projectName
         }
       });
+      
+      if (functionError) throw functionError;
       
       setShowOtpInput(true);
       toast({
@@ -155,24 +152,18 @@ const VoterLogin = () => {
       if (voterError) throw voterError;
       
       // Verify OTP
-      const { data: otpData, error: otpError } = await supabase
-        .from('voter_otps')
-        .select('*')
-        .eq('voter_id', voterData.id)
-        .eq('otp', otp)
-        .eq('used', false)
-        .gt('expires_at', new Date().toISOString())
-        .single();
+      const { data: otpData, error: otpError } = await supabase.rpc('verify_voter_otp', {
+        v_voter_id: voterData.id,
+        v_otp: otp
+      });
         
       if (otpError) {
         throw new Error('Invalid or expired OTP. Please request a new one.');
       }
       
-      // Mark OTP as used
-      await supabase
-        .from('voter_otps')
-        .update({ used: true })
-        .eq('id', otpData.id);
+      if (!otpData) {
+        throw new Error('Invalid or expired OTP. Please request a new one.');
+      }
       
       // Store voter info in session storage
       sessionStorage.setItem('voter', JSON.stringify({

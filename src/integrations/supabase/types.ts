@@ -168,6 +168,44 @@ export type Database = {
           },
         ]
       }
+      voter_otps: {
+        Row: {
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          otp: string
+          used: boolean
+          voter_id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          expires_at: string
+          id?: string
+          otp: string
+          used?: boolean
+          voter_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          otp?: string
+          used?: boolean
+          voter_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voter_otps_voter_id_fkey"
+            columns: ["voter_id"]
+            isOneToOne: false
+            referencedRelation: "voters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       voters: {
         Row: {
           company_name: string | null
