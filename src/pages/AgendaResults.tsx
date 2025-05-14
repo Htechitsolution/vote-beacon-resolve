@@ -1,8 +1,9 @@
+
 import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileText, ArrowLeft } from "lucide-react";
+import { FileText, ArrowLeft, Download, Mail } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -23,6 +24,8 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 
 type Agenda = {
   id: string;
@@ -73,14 +76,25 @@ type VoteResult = {
   file_path?: string | null;
 };
 
+type Voter = {
+  id: string;
+  email: string;
+  name: string;
+  company_name?: string | null;
+  project_id: string;
+};
+
 const AgendaResults = () => {
   const { projectId, agendaId } = useParams<{ projectId: string; agendaId: string }>();
   const [agenda, setAgenda] = useState<Agenda | null>(null);
   const [project, setProject] = useState<Project | null>(null);
   const [options, setOptions] = useState<Option[]>([]);
+  const [voters, setVoters] = useState<Voter[]>([]);
   const [loading, setLoading] = useState(true);
   const [results, setResults] = useState<VoteResult[]>([]);
+  const [sendingEmails, setSendingEmails] = useState(false);
   const { user, profile } = useAuth();
+  const resultsRef = React.useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (projectId && agendaId) {
@@ -128,6 +142,15 @@ const AgendaResults = () => {
         .eq('agenda_id', agendaId);
 
       if (votesError) throw votesError;
+      
+      // Fetch voters
+      const { data: votersData, error: votersError } = await supabase
+        .from('voters')
+        .select('id, email, name, company_name, project_id')
+        .eq('project_id', projectId);
+
+      if (votersError) throw votersError;
+      setVoters(votersData || []);
       
       // Process votes data and calculate results
       calculateResults(optionsData || [], votesData || []);
@@ -207,6 +230,142 @@ const AgendaResults = () => {
     }
   };
 
+  const generatePDF = async () => {
+    if (!resultsRef.current) return;
+    
+    try {
+      toast.info("Generating PDF...");
+      
+      const container = resultsRef.current;
+      const canvas = await html2canvas(container, {
+        scale: 2,
+        useCORS: true,
+        logging: false
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+      
+      const imgWidth = 190;
+      const pageHeight = 290;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 10;
+      
+      // Add title and date to PDF
+      pdf.setFontSize(16);
+      pdf.text(`${project?.title || 'Project'} - ${agenda?.title || 'Agenda'} Results`, 105, position, { align: 'center' });
+      position += 10;
+      pdf.setFontSize(10);
+      pdf.text(`Generated on ${new Date().toLocaleDateString()}`, 105, position, { align: 'center' });
+      position += 15;
+      
+      // Add the image to the PDF
+      pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+      
+      // Add additional pages if needed
+      while (heightLeft >= 0) {
+        position = 0;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+      
+      // Save the PDF
+      pdf.save(`${project?.title || 'Project'}_${agenda?.title || 'Agenda'}_Results.pdf`);
+      toast.success("PDF generated successfully");
+      
+      return pdf.output('blob');
+    } catch (error: any) {
+      console.error("Error generating PDF:", error);
+      toast.error("Failed to generate PDF");
+      return null;
+    }
+  };
+
+  const emailResultsToPDF = async () => {
+    try {
+      setSendingEmails(true);
+      toast.info("Preparing to send results to voters...");
+      
+      // Generate PDF
+      const pdfBlob = await generatePDF();
+      if (!pdfBlob) {
+        throw new Error("Failed to generate PDF");
+      }
+      
+      // Create a FormData to upload the PDF to Supabase Storage
+      const formData = new FormData();
+      formData.append('file', pdfBlob, `${project?.title || 'Project'}_${agenda?.title || 'Agenda'}_Results.pdf`);
+      
+      const fileName = `results/${projectId}/${agendaId}/${Date.now()}.pdf`;
+      
+      // Upload PDF to Supabase Storage
+      const { data: fileData, error: fileError } = await supabase.storage
+        .from('voting-documents')
+        .upload(fileName, pdfBlob, {
+          contentType: 'application/pdf'
+        });
+        
+      if (fileError) throw fileError;
+      
+      // Get public URL of the file
+      const { data: urlData } = await supabase.storage
+        .from('voting-documents')
+        .getPublicUrl(fileName);
+        
+      const fileUrl = urlData.publicUrl;
+      
+      // Send emails to all voters
+      let successCount = 0;
+      let errorCount = 0;
+      
+      for (const voter of voters) {
+        try {
+          // Send email using our edge function
+          const { error: functionError } = await supabase.functions.invoke('send-voter-otp', {
+            body: { 
+              email: voter.email,
+              otp: "RESULTS", // Not actually using this for OTP here
+              voterName: voter.name || "Voter",
+              projectName: project?.title || "Meeting",
+              isResultEmail: true,
+              resultTitle: agenda?.title || "Voting",
+              resultUrl: fileUrl
+            }
+          });
+          
+          if (functionError) throw functionError;
+          
+          successCount++;
+        } catch (error) {
+          console.error(`Failed to send results to ${voter.email}:`, error);
+          errorCount++;
+        }
+        
+        // Add a small delay between emails to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
+      if (errorCount === 0) {
+        toast.success(`Successfully sent results to all ${successCount} voters`);
+      } else {
+        toast.warning(`Sent ${successCount} emails, but ${errorCount} failed. Check console for details.`);
+      }
+      
+    } catch (error: any) {
+      console.error("Error sending results:", error.message);
+      toast.error(`Failed to send results: ${error.message}`);
+    } finally {
+      setSendingEmails(false);
+    }
+  };
+
   if (loading) {
     return (
       <div>
@@ -268,75 +427,101 @@ const AgendaResults = () => {
               <h1 className="text-3xl font-bold mb-2">{agenda?.title} - Results</h1>
               <p className="text-gray-600">{agenda?.description}</p>
             </div>
-            <Button variant="outline" asChild>
-              <Link to={`/projects/${projectId}/agenda/${agendaId}`}>
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Agenda
-              </Link>
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={generatePDF} className="flex items-center gap-2">
+                <Download className="mr-1 h-4 w-4" />
+                Download Results
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={emailResultsToPDF} 
+                disabled={sendingEmails || voters.length === 0} 
+                className="flex items-center gap-2"
+              >
+                {sendingEmails ? (
+                  <>
+                    <span className="animate-spin mr-1 h-4 w-4 border-b-2 rounded-full border-evoting-600"></span>
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <Mail className="mr-1 h-4 w-4" />
+                    Email Results
+                  </>
+                )}
+              </Button>
+              <Button variant="outline" asChild>
+                <Link to={`/projects/${projectId}/agenda/${agendaId}`}>
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back to Agenda
+                </Link>
+              </Button>
+            </div>
           </div>
         </div>
         
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle>Voting Results</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {results.length === 0 ? (
-              <div className="text-center py-4">
-                <p className="text-gray-500">No voting data available yet.</p>
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Option</TableHead>
-                    <TableHead>Approve</TableHead>
-                    <TableHead>Reject</TableHead>
-                    <TableHead>Abstain</TableHead>
-                    <TableHead>Result</TableHead>
-                    <TableHead>Document</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {results.map((result) => (
-                    <TableRow key={result.option_id}>
-                      <TableCell className="font-medium">{result.option_title}</TableCell>
-                      <TableCell>{result.approve} ({Math.round(result.approve_percentage)}%)</TableCell>
-                      <TableCell>{result.reject} ({Math.round(100 - result.approve_percentage)}%)</TableCell>
-                      <TableCell>{result.abstain}</TableCell>
-                      <TableCell>
-                        <div className="space-y-2">
-                          <Progress value={result.approve_percentage} className="h-2" />
-                          {result.approve_percentage >= 50 ? (
-                            <Badge variant="success">Passed</Badge>
-                          ) : (
-                            <Badge variant="destructive">Failed</Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {result.file_path && result.file_name ? (
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={() => handleDownloadFile(result.file_path!, result.file_name!)}
-                            className="flex items-center gap-2"
-                          >
-                            <FileText className="h-4 w-4" />
-                            Download
-                          </Button>
-                        ) : (
-                          <span className="text-gray-400 text-sm">No document</span>
-                        )}
-                      </TableCell>
+        <div ref={resultsRef}>
+          <Card className="mb-8">
+            <CardHeader>
+              <CardTitle>Voting Results</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {results.length === 0 ? (
+                <div className="text-center py-4">
+                  <p className="text-gray-500">No voting data available yet.</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Option</TableHead>
+                      <TableHead>Approve</TableHead>
+                      <TableHead>Reject</TableHead>
+                      <TableHead>Abstain</TableHead>
+                      <TableHead>Result</TableHead>
+                      <TableHead>Document</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {results.map((result) => (
+                      <TableRow key={result.option_id}>
+                        <TableCell className="font-medium">{result.option_title}</TableCell>
+                        <TableCell>{result.approve} ({Math.round(result.approve_percentage)}%)</TableCell>
+                        <TableCell>{result.reject} ({Math.round(100 - result.approve_percentage)}%)</TableCell>
+                        <TableCell>{result.abstain}</TableCell>
+                        <TableCell>
+                          <div className="space-y-2">
+                            <Progress value={result.approve_percentage} className="h-2" />
+                            {result.approve_percentage >= 50 ? (
+                              <Badge variant="success">Passed</Badge>
+                            ) : (
+                              <Badge variant="destructive">Failed</Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {result.file_path && result.file_name ? (
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={() => handleDownloadFile(result.file_path!, result.file_name!)}
+                              className="flex items-center gap-2"
+                            >
+                              <FileText className="h-4 w-4" />
+                              Download
+                            </Button>
+                          ) : (
+                            <span className="text-gray-400 text-sm">No document</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );

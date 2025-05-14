@@ -16,7 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { X, Search, Users, Percent, Trash2, Download, Upload } from "lucide-react";
+import { X, Search, Users, Percent, Trash2, Download, Upload, Mail, MailCheck } from "lucide-react";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -76,6 +76,8 @@ const VoterManagement = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [totalWeight, setTotalWeight] = useState(0);
   const [uniqueCompanies, setUniqueCompanies] = useState<Map<string, number>>(new Map());
+  const [sendingEmails, setSendingEmails] = useState<Record<string, boolean>>({});
+  const [sendingAllEmails, setSendingAllEmails] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<VoterFormValues>({
@@ -239,6 +241,116 @@ const VoterManagement = () => {
     } catch (error: any) {
       console.error("Error removing voter:", error.message);
       toast.error(error.message);
+    }
+  };
+
+  const sendVotingLinkEmail = async (voter: Voter) => {
+    try {
+      setSendingEmails(prev => ({ ...prev, [voter.id]: true }));
+      
+      // Generate a 6-digit OTP
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      
+      // Store OTP in the database with expiration time (15 mins)
+      const expiresAt = new Date();
+      expiresAt.setMinutes(expiresAt.getMinutes() + 15);
+      
+      // Store the OTP in the voter_otps table
+      const { error: otpError } = await supabase.rpc('create_voter_otp', {
+        v_voter_id: voter.id,
+        v_email: voter.email,
+        v_otp: otp,
+        v_expires_at: expiresAt.toISOString()
+      });
+      
+      if (otpError) throw otpError;
+      
+      // Prepare the voting link - this will be a deep link that can be used to access the voting page
+      const votingLink = `${window.location.origin}/projects/${projectId}/voter-login`;
+      
+      // Send OTP via email using our edge function
+      const { error: functionError } = await supabase.functions.invoke('send-voter-otp', {
+        body: { 
+          email: voter.email,
+          otp: otp,
+          voterName: voter.name,
+          projectName: project?.title || "Meeting",
+          votingLink: votingLink
+        }
+      });
+      
+      if (functionError) throw functionError;
+      
+      toast.success(`Voting link sent to ${voter.email}`);
+    } catch (error: any) {
+      console.error("Error sending voting link:", error.message);
+      toast.error(`Failed to send voting link: ${error.message}`);
+    } finally {
+      setSendingEmails(prev => ({ ...prev, [voter.id]: false }));
+    }
+  };
+  
+  const sendAllVotingLinks = async () => {
+    try {
+      setSendingAllEmails(true);
+      let successCount = 0;
+      let errorCount = 0;
+      
+      for (const voter of voters) {
+        try {
+          // Generate a 6-digit OTP
+          const otp = Math.floor(100000 + Math.random() * 900000).toString();
+          
+          // Store OTP in the database with expiration time (15 mins)
+          const expiresAt = new Date();
+          expiresAt.setMinutes(expiresAt.getMinutes() + 15);
+          
+          // Store the OTP in the voter_otps table
+          const { error: otpError } = await supabase.rpc('create_voter_otp', {
+            v_voter_id: voter.id,
+            v_email: voter.email,
+            v_otp: otp,
+            v_expires_at: expiresAt.toISOString()
+          });
+          
+          if (otpError) throw otpError;
+          
+          // Prepare the voting link
+          const votingLink = `${window.location.origin}/projects/${projectId}/voter-login`;
+          
+          // Send OTP via email using our edge function
+          const { error: functionError } = await supabase.functions.invoke('send-voter-otp', {
+            body: { 
+              email: voter.email,
+              otp: otp,
+              voterName: voter.name,
+              projectName: project?.title || "Meeting",
+              votingLink: votingLink
+            }
+          });
+          
+          if (functionError) throw functionError;
+          
+          successCount++;
+        } catch (error) {
+          console.error(`Failed to send to ${voter.email}:`, error);
+          errorCount++;
+        }
+        
+        // Add a small delay between emails to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
+      if (errorCount === 0) {
+        toast.success(`Successfully sent voting links to all ${successCount} voters`);
+      } else {
+        toast.warning(`Sent ${successCount} emails, but ${errorCount} failed. Check console for details.`);
+      }
+    } catch (error: any) {
+      console.error("Error sending voting links:", error.message);
+      toast.error("Failed to send voting links");
+    } finally {
+      setSendingAllEmails(false);
     }
   };
 
@@ -574,6 +686,15 @@ const VoterManagement = () => {
               <Download size={16} />
               Export CSV
             </Button>
+            <Button
+              variant="outline"
+              className="flex items-center gap-2"
+              onClick={sendAllVotingLinks}
+              disabled={voters.length === 0 || sendingAllEmails}
+            >
+              <Mail size={16} />
+              {sendingAllEmails ? "Sending..." : "Email All Voting Links"}
+            </Button>
           </div>
         </div>
 
@@ -592,7 +713,7 @@ const VoterManagement = () => {
                     <TableHead>Company</TableHead>
                     <TableHead className="text-right">Weight (%)</TableHead>
                     <TableHead className="text-right">Status</TableHead>
-                    <TableHead className="w-[80px]">Actions</TableHead>
+                    <TableHead className="w-[160px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -603,7 +724,28 @@ const VoterManagement = () => {
                       <TableCell>{voter.company_name || "-"}</TableCell>
                       <TableCell className="text-right">{voter.voting_weight}</TableCell>
                       <TableCell className="text-right capitalize">{voter.status}</TableCell>
-                      <TableCell>
+                      <TableCell className="flex gap-2 items-center">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex items-center gap-1"
+                          onClick={() => sendVotingLinkEmail(voter)}
+                          disabled={sendingEmails[voter.id]}
+                          title="Send voting link"
+                        >
+                          {sendingEmails[voter.id] ? (
+                            <span className="flex items-center">
+                              <span className="animate-spin mr-1 h-4 w-4 border-b-2 rounded-full border-evoting-600"></span>
+                              Sending
+                            </span>
+                          ) : (
+                            <>
+                              <Mail className="h-3.5 w-3.5 text-evoting-600" />
+                              Link
+                            </>
+                          )}
+                        </Button>
+                        
                         {!isVotingClosed && (
                           <Button
                             variant="ghost"

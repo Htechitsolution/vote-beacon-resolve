@@ -1,5 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -27,6 +28,8 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error("Email and OTP are required");
     }
 
+    console.log(`Sending OTP ${otp} to ${email} for project ${projectName}`);
+
     // Create Supabase client
     const supabaseUrl = Deno.env.get("SUPABASE_URL") as string;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") as string;
@@ -53,8 +56,11 @@ const handler = async (req: Request): Promise<Response> => {
     });
 
     if (error) {
+      console.error("Error sending email:", error);
       throw error;
     }
+
+    console.log(`OTP sent successfully to ${email}`);
 
     return new Response(
       JSON.stringify({ success: true, message: "OTP sent successfully" }),
@@ -73,47 +79,6 @@ const handler = async (req: Request): Promise<Response> => {
       }
     );
   }
-};
-
-// Helper to create a Supabase client
-const createClient = (supabaseUrl: string, supabaseKey: string) => {
-  return createSupabaseClient(supabaseUrl, supabaseKey);
-};
-
-const createSupabaseClient = (supabaseUrl: string, supabaseKey: string) => {
-  return {
-    auth: {
-      admin: {
-        sendRawEmail: async ({ email, subject, html }: { email: string, subject: string, html: string }) => {
-          try {
-            const response = await fetch(`${supabaseUrl}/auth/v1/admin/send-email`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${supabaseKey}`,
-                'apikey': supabaseKey
-              },
-              body: JSON.stringify({
-                email,
-                subject,
-                html,
-                data: {}
-              })
-            });
-            
-            if (!response.ok) {
-              const errorData = await response.json();
-              return { error: new Error(errorData.message || 'Failed to send email') };
-            }
-            
-            return { data: {}, error: null };
-          } catch (error) {
-            return { error };
-          }
-        }
-      }
-    }
-  };
 };
 
 serve(handler);
