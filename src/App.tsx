@@ -12,7 +12,6 @@ import ForgotPasswordPage from './pages/ForgotPassword';
 import NotFoundPage from './pages/NotFound';
 import TermsPage from './pages/Terms';
 import PrivacyPage from './pages/Privacy';
-import SuperAdminPage from './pages/SuperAdmin';
 import AdminDashboardPage from './pages/AdminDashboard';
 import ProjectsPage from './pages/Projects';
 import ProjectDetailPage from './pages/ProjectDetail';
@@ -51,7 +50,7 @@ function App() {
         
         {/* Super admin routes */}
         <Route element={<SuperAdminRoute />}>
-          <Route path="/super-admin" element={<SuperAdminPage />} />
+          <Route path="/super-admin" element={<AdminDashboardPage />} />
           <Route path="/admin-dashboard" element={<AdminDashboardPage />} />
         </Route>
         

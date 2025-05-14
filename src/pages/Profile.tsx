@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { User, Mail, Building, Calendar } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,6 +24,8 @@ import * as z from "zod";
 const profileFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
   company_name: z.string().optional(),
+  ibc_registration_number: z.string().optional(),
+  communications_address: z.string().optional(),
 });
 
 type ProfileFormValues = z.infer<typeof profileFormSchema>;
@@ -36,6 +39,8 @@ const Profile = () => {
     defaultValues: {
       name: profile?.name || "",
       company_name: profile?.company_name || "",
+      ibc_registration_number: profile?.ibc_registration_number || "",
+      communications_address: profile?.communications_address || "",
     },
   });
 
@@ -44,6 +49,8 @@ const Profile = () => {
     if (profile) {
       form.setValue("name", profile.name);
       form.setValue("company_name", profile.company_name || "");
+      form.setValue("ibc_registration_number", profile.ibc_registration_number || "");
+      form.setValue("communications_address", profile.communications_address || "");
     }
   }, [profile, form]);
 
@@ -58,6 +65,8 @@ const Profile = () => {
         .update({
           name: values.name,
           company_name: values.company_name || null,
+          ibc_registration_number: values.ibc_registration_number || null,
+          communications_address: values.communications_address || null,
         })
         .eq('id', user.id);
         
@@ -157,6 +166,38 @@ const Profile = () => {
                         <FormLabel>Company Name (Optional)</FormLabel>
                         <FormControl>
                           <Input {...field} value={field.value || ""} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="ibc_registration_number"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>IBC Registration Number</FormLabel>
+                        <FormControl>
+                          <Input {...field} value={field.value || ""} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="communications_address"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Communications Address</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            {...field} 
+                            value={field.value || ""} 
+                            rows={4}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

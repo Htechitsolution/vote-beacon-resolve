@@ -1,0 +1,16 @@
+
+-- Create subscription_plans table
+CREATE TABLE IF NOT EXISTS public.subscription_plans (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  description TEXT NOT NULL,
+  price INTEGER NOT NULL,
+  credits INTEGER NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+);
+
+-- Add new columns to profiles table
+ALTER TABLE public.profiles
+ADD COLUMN IF NOT EXISTS ibc_registration_number TEXT,
+ADD COLUMN IF NOT EXISTS communications_address TEXT;

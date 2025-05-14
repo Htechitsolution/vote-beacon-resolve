@@ -1,12 +1,13 @@
+
 import React, { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Navigation from "@/components/layout/Navigation";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Search, User, FileText, CheckSquare, IndianRupee, Plus, Trash2, Edit } from "lucide-react";
-import { toast } from "@/components/ui/use-toast";
+import { Search, User, FileText, CheckSquare, IndianRupee, Plus, Trash2, Edit, Mail } from "lucide-react";
+import { toast } from "sonner";
 import {
   Table,
   TableBody,
@@ -73,11 +74,7 @@ const AdminDashboard = () => {
     totalMeetings: 0,
     liveMeetings: 0,
   });
-  const [plans, setPlans] = useState<SubscriptionPlan[]>([
-    { id: "1", name: "Basic Plan", description: "10 credits", price: 2999, credits: 10 },
-    { id: "2", name: "Standard Plan", description: "50 credits", price: 7999, credits: 50 },
-    { id: "3", name: "Premium Plan", description: "100 credits", price: 14999, credits: 100 },
-  ]);
+  const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [newPlan, setNewPlan] = useState({
     name: "",
     description: "",
@@ -89,6 +86,11 @@ const AdminDashboard = () => {
   const [isDeletingPlan, setIsDeletingPlan] = useState(false);
   const [currentPlan, setCurrentPlan] = useState<SubscriptionPlan | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isAddCreditsDialogOpen, setIsAddCreditsDialogOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [creditsToAdd, setCreditsToAdd] = useState<number>(0);
+  const [superAdminEmail, setSuperAdminEmail] = useState("");
+  const [grantingAccess, setGrantingAccess] = useState(false);
   const { isSuper } = useAuth();
 
   useEffect(() => {
@@ -136,34 +138,54 @@ const AdminDashboard = () => {
         liveMeetings: agendasData.filter(a => a.status === 'live').length,
       });
       
+      // Fetch plans from database if available, otherwise use empty array
+      const { data: plansData, error: plansError } = await supabase
+        .from('subscription_plans')
+        .select('*');
+      
+      if (plansError) {
+        console.error("Error fetching plans:", plansError);
+        setPlans([]);
+      } else {
+        setPlans(plansData || []);
+      }
+      
     } catch (error: any) {
       console.error("Error fetching data:", error.message);
-      toast("Error", {
-        description: "Failed to load dashboard data",
-        variant: "destructive"
-      });
+      toast.error("Failed to load dashboard data");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleAddPlan = () => {
+  const handleAddPlan = async () => {
     if (!newPlan.name || !newPlan.description || newPlan.price <= 0 || newPlan.credits <= 0) {
-      toast("Error", {
-        description: "Please fill in all plan details",
-        variant: "destructive"
-      });
+      toast.error("Please fill in all plan details");
       return;
     }
     
-    const newId = String(plans.length + 1);
-    setPlans([...plans, { ...newPlan, id: newId }]);
-    setNewPlan({ name: "", description: "", price: 0, credits: 0 });
-    setIsAddingPlan(false);
-    
-    toast("Success", {
-      description: "Subscription plan added successfully"
-    });
+    try {
+      const { data, error } = await supabase
+        .from('subscription_plans')
+        .insert([{
+          name: newPlan.name,
+          description: newPlan.description,
+          price: newPlan.price,
+          credits: newPlan.credits
+        }])
+        .select();
+      
+      if (error) throw error;
+      
+      setPlans([...plans, data[0]]);
+      setNewPlan({ name: "", description: "", price: 0, credits: 0 });
+      setIsAddingPlan(false);
+      
+      toast.success("Subscription plan added successfully");
+    } catch (error: any) {
+      console.error("Error adding plan:", error);
+      toast.error("Failed to add subscription plan");
+    }
   };
 
   const handleEditPlan = (plan: SubscriptionPlan) => {
@@ -176,30 +198,139 @@ const AdminDashboard = () => {
     setIsDeletingPlan(true);
   };
 
-  const handleUpdatePlan = () => {
+  const handleUpdatePlan = async () => {
     if (!currentPlan) return;
     
-    const updatedPlans = plans.map(p => 
-      p.id === currentPlan.id ? currentPlan : p
-    );
-    
-    setPlans(updatedPlans);
-    setIsEditingPlan(false);
-    toast("Success", {
-      description: "Plan updated successfully"
-    });
+    try {
+      const { error } = await supabase
+        .from('subscription_plans')
+        .update({
+          name: currentPlan.name,
+          description: currentPlan.description,
+          price: currentPlan.price,
+          credits: currentPlan.credits,
+        })
+        .eq('id', currentPlan.id);
+      
+      if (error) throw error;
+      
+      setPlans(plans.map(p => p.id === currentPlan.id ? currentPlan : p));
+      setIsEditingPlan(false);
+      toast.success("Plan updated successfully");
+    } catch (error: any) {
+      console.error("Error updating plan:", error);
+      toast.error("Failed to update subscription plan");
+    }
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!currentPlan) return;
     
-    const filteredPlans = plans.filter(p => p.id !== currentPlan.id);
-    setPlans(filteredPlans);
-    setIsDeletingPlan(false);
-    
-    toast("Success", {
-      description: "Plan deleted successfully"
-    });
+    try {
+      const { error } = await supabase
+        .from('subscription_plans')
+        .delete()
+        .eq('id', currentPlan.id);
+      
+      if (error) throw error;
+      
+      setPlans(plans.filter(p => p.id !== currentPlan.id));
+      setIsDeletingPlan(false);
+      
+      toast.success("Plan deleted successfully");
+    } catch (error: any) {
+      console.error("Error deleting plan:", error);
+      toast.error("Failed to delete subscription plan");
+    }
+  };
+
+  const openAddCreditsDialog = (user: User) => {
+    setSelectedUser(user);
+    setCreditsToAdd(0);
+    setIsAddCreditsDialogOpen(true);
+  };
+
+  const handleAddCredits = async () => {
+    if (!selectedUser || creditsToAdd <= 0) {
+      toast.error("Please enter a valid number of credits to add");
+      return;
+    }
+
+    try {
+      // Calculate new credit total
+      const newCreditTotal = (selectedUser.credits || 0) + creditsToAdd;
+      
+      // Update user credits in the database
+      const { error } = await supabase
+        .from('profiles')
+        .update({ 
+          credits: newCreditTotal,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', selectedUser.id);
+
+      if (error) throw error;
+      
+      // Update local state
+      setUsers(prevUsers => 
+        prevUsers.map(user => 
+          user.id === selectedUser.id 
+            ? { ...user, credits: newCreditTotal } 
+            : user
+        )
+      );
+      
+      setIsAddCreditsDialogOpen(false);
+      toast.success(`${creditsToAdd} credits added to ${selectedUser.name}'s account`);
+    } catch (error: any) {
+      console.error("Error adding credits:", error.message);
+      toast.error(`Failed to add credits: ${error.message}`);
+    }
+  };
+
+  const makeSuperAdmin = async () => {
+    try {
+      setGrantingAccess(true);
+
+      if (!superAdminEmail) {
+        toast.error("Please enter an email address");
+        return;
+      }
+
+      // First, find the user's profile by email
+      const { data: profiles, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', superAdminEmail)
+        .limit(1);
+
+      if (profileError) throw profileError;
+
+      if (!profiles || profiles.length === 0) {
+        toast.error("No user found with this email address");
+        return;
+      }
+
+      // Update the user's role to super_admin
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ role: 'super_admin' })
+        .eq('id', profiles[0].id);
+
+      if (updateError) throw updateError;
+
+      toast.success(`User ${superAdminEmail} has been granted super admin rights`);
+      setSuperAdminEmail("");
+      
+      // Refresh user data
+      fetchData();
+      
+    } catch (error: any) {
+      console.error("Error updating user role:", error.message);
+      toast.error(error.message || "Failed to update user role");
+    } finally {
+      setGrantingAccess(false);
+    }
   };
 
   const filteredUsers = users.filter(user => 
@@ -232,7 +363,6 @@ const AdminDashboard = () => {
     );
   }
 
-  
   return (
     <div>
       <Navigation />
@@ -258,6 +388,37 @@ const AdminDashboard = () => {
             <p className="text-gray-600 mt-1">Manage users, projects, and subscription plans</p>
           </div>
         </div>
+        
+        {/* Grant Super Admin Rights Section */}
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle>Grant Super Admin Rights</CardTitle>
+            <CardDescription>
+              Make an existing user a super administrator by entering their email address.
+              Super admins have full access to all projects and users.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-4">
+              <Input
+                placeholder="Enter user email address"
+                value={superAdminEmail}
+                onChange={(e) => setSuperAdminEmail(e.target.value)}
+                className="flex-1"
+              />
+              <Button 
+                onClick={makeSuperAdmin} 
+                disabled={grantingAccess}
+                className="bg-evoting-600 hover:bg-evoting-700 text-white"
+              >
+                {grantingAccess ? "Processing..." : "Grant Access"}
+              </Button>
+            </div>
+          </CardContent>
+          <CardFooter className="text-sm text-gray-500">
+            Note: The user must already have an account in the system.
+          </CardFooter>
+        </Card>
         
         {/* Stats Overview */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
@@ -336,103 +497,107 @@ const AdminDashboard = () => {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {plans.map((plan) => (
-              <Card key={plan.id} className="border-2 hover:border-evoting-600 transition-all">
-                <CardHeader className="relative">
-                  <CardTitle>{plan.name}</CardTitle>
-                  <div className="absolute top-2 right-2 flex space-x-1">
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-8 w-8 text-gray-500"
-                      onClick={() => handleEditPlan(plan)}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-8 w-8 text-gray-500"
-                      onClick={() => handleDeletePlan(plan)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-gray-600 mb-4">{plan.description}</p>
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-baseline">
-                      <IndianRupee className="h-4 w-4 mr-1" />
-                      <span className="text-3xl font-bold">{(plan.price / 100).toLocaleString('en-IN')}</span>
+            {plans.length > 0 ? (
+              plans.map((plan) => (
+                <Card key={plan.id} className="border-2 hover:border-evoting-600 transition-all">
+                  <CardHeader className="relative">
+                    <CardTitle>{plan.name}</CardTitle>
+                    <div className="absolute top-2 right-2 flex space-x-1">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 text-gray-500"
+                        onClick={() => handleEditPlan(plan)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 text-gray-500"
+                        onClick={() => handleDeletePlan(plan)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
-                    <span className="bg-evoting-50 text-evoting-700 px-3 py-1 rounded-full text-sm font-medium">
-                      {plan.credits} credits
-                    </span>
-                  </div>
-                </CardContent>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-gray-600 mb-4">{plan.description}</p>
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-baseline">
+                        <IndianRupee className="h-4 w-4 mr-1" />
+                        <span className="text-3xl font-bold">{(plan.price / 100).toLocaleString('en-IN')}</span>
+                      </div>
+                      <span className="bg-evoting-50 text-evoting-700 px-3 py-1 rounded-full text-sm font-medium">
+                        {plan.credits} credits
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              <Card className="col-span-3 p-8 text-center">
+                <p className="text-gray-500 mb-4">No subscription plans found. Add your first plan!</p>
               </Card>
-            ))}
+            )}
           </div>
           
           {/* Add Plan Dialog */}
-          {isAddingPlan && (
-            <Dialog open={isAddingPlan} onOpenChange={setIsAddingPlan}>
-              <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Add New Subscription Plan</DialogTitle>
-                  <DialogDescription>
-                    Create a new subscription plan for your customers
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="plan-name">Plan Name</Label>
-                    <Input 
-                      id="plan-name"
-                      value={newPlan.name} 
-                      onChange={(e) => setNewPlan({...newPlan, name: e.target.value})}
-                      placeholder="e.g. Premium Plan"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="plan-description">Description</Label>
-                    <Input 
-                      id="plan-description"
-                      value={newPlan.description} 
-                      onChange={(e) => setNewPlan({...newPlan, description: e.target.value})}
-                      placeholder="e.g. 100 credits"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="plan-price">Price (₹)</Label>
-                    <Input 
-                      id="plan-price"
-                      type="number" 
-                      value={newPlan.price === 0 ? '' : (newPlan.price / 100)} 
-                      onChange={(e) => setNewPlan({...newPlan, price: Math.round(parseFloat(e.target.value || '0') * 100)})}
-                      placeholder="e.g. 999.99"
-                    />
-                    <p className="text-xs text-gray-500">Enter the price in INR (Indian Rupees)</p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="plan-credits">Credits</Label>
-                    <Input 
-                      id="plan-credits"
-                      type="number" 
-                      value={newPlan.credits || ''} 
-                      onChange={(e) => setNewPlan({...newPlan, credits: parseInt(e.target.value || '0')})}
-                      placeholder="e.g. 100"
-                    />
-                  </div>
+          <Dialog open={isAddingPlan} onOpenChange={setIsAddingPlan}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Add New Subscription Plan</DialogTitle>
+                <DialogDescription>
+                  Create a new subscription plan for your customers
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="plan-name">Plan Name</Label>
+                  <Input 
+                    id="plan-name"
+                    value={newPlan.name} 
+                    onChange={(e) => setNewPlan({...newPlan, name: e.target.value})}
+                    placeholder="e.g. Premium Plan"
+                  />
                 </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsAddingPlan(false)}>Cancel</Button>
-                  <Button className="bg-evoting-600 hover:bg-evoting-700" onClick={handleAddPlan}>Save Plan</Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          )}
+                <div className="space-y-2">
+                  <Label htmlFor="plan-description">Description</Label>
+                  <Input 
+                    id="plan-description"
+                    value={newPlan.description} 
+                    onChange={(e) => setNewPlan({...newPlan, description: e.target.value})}
+                    placeholder="e.g. 100 credits"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="plan-price">Price (₹)</Label>
+                  <Input 
+                    id="plan-price"
+                    type="number" 
+                    value={newPlan.price === 0 ? '' : (newPlan.price / 100)} 
+                    onChange={(e) => setNewPlan({...newPlan, price: Math.round(parseFloat(e.target.value || '0') * 100)})}
+                    placeholder="e.g. 999.99"
+                  />
+                  <p className="text-xs text-gray-500">Enter the price in INR (Indian Rupees)</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="plan-credits">Credits</Label>
+                  <Input 
+                    id="plan-credits"
+                    type="number" 
+                    value={newPlan.credits || ''} 
+                    onChange={(e) => setNewPlan({...newPlan, credits: parseInt(e.target.value || '0')})}
+                    placeholder="e.g. 100"
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsAddingPlan(false)}>Cancel</Button>
+                <Button className="bg-evoting-600 hover:bg-evoting-700" onClick={handleAddPlan}>Save Plan</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
           
           {/* Edit Plan Dialog */}
           {isEditingPlan && currentPlan && (
@@ -537,7 +702,7 @@ const AdminDashboard = () => {
                     <TableHead className="hidden md:table-cell">Joined</TableHead>
                     <TableHead>Credits</TableHead>
                     <TableHead>Meetings</TableHead>
-                    <TableHead>Add Credits</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -555,15 +720,17 @@ const AdminDashboard = () => {
                       </TableCell>
                       <TableCell>{user.meeting_count || 0}</TableCell>
                       <TableCell>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => navigate('/super-admin')}
-                          className="text-evoting-600 hover:bg-evoting-50"
-                        >
-                          <Plus className="h-4 w-4 mr-1" />
-                          Add
-                        </Button>
+                        <div className="flex space-x-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => openAddCreditsDialog(user)}
+                            className="text-evoting-600 hover:bg-evoting-50"
+                          >
+                            <Plus className="h-4 w-4 mr-1" />
+                            Add Credits
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -576,6 +743,57 @@ const AdminDashboard = () => {
             <div className="text-center py-10">
               <p className="text-gray-500">No users found matching your search.</p>
             </div>
+          )}
+
+          {/* Add Credits Dialog */}
+          {isAddCreditsDialogOpen && selectedUser && (
+            <Dialog open={isAddCreditsDialogOpen} onOpenChange={setIsAddCreditsDialogOpen}>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Add Credits</DialogTitle>
+                  <DialogDescription>
+                    Add credits to {selectedUser.name}'s account ({selectedUser.email})
+                  </DialogDescription>
+                </DialogHeader>
+                
+                <div className="py-6">
+                  <div className="flex justify-between items-center mb-4">
+                    <Label htmlFor="current-credits">Current Credits:</Label>
+                    <span className="font-semibold">{selectedUser.credits || 0}</span>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="add-credits">Credits to Add</Label>
+                    <div className="flex items-center">
+                      <IndianRupee className="h-4 w-4 mr-2 text-gray-500" />
+                      <Input
+                        id="add-credits"
+                        type="number"
+                        value={creditsToAdd || ''}
+                        onChange={(e) => setCreditsToAdd(Math.max(0, parseInt(e.target.value) || 0))}
+                        className="flex-1"
+                        min="1"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="mt-4 p-3 bg-gray-50 rounded-md">
+                    <p className="text-sm text-gray-600">
+                      New Balance: <span className="font-semibold">{(selectedUser.credits || 0) + creditsToAdd}</span> credits
+                    </p>
+                  </div>
+                </div>
+                
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsAddCreditsDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleAddCredits} disabled={creditsToAdd <= 0}>
+                    Add Credits
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           )}
         </div>
       </div>
