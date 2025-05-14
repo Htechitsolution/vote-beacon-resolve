@@ -310,9 +310,22 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_voter_otp: {
+        Args: {
+          v_voter_id: string
+          v_email: string
+          v_otp: string
+          v_expires_at: string
+        }
+        Returns: boolean
+      }
       get_user_role: {
         Args: Record<PropertyKey, never>
         Returns: Database["public"]["Enums"]["user_role"]
+      }
+      verify_voter_otp: {
+        Args: { v_voter_id: string; v_otp: string }
+        Returns: boolean
       }
     }
     Enums: {
