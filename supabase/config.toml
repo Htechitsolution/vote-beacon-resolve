@@ -1,1 +1,4 @@
+
 project_id = "crnpusxrbjozxdeeaotw"
+[functions.send-voter-otp]
+verify_jwt = false
