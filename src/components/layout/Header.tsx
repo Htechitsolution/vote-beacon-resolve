@@ -13,7 +13,7 @@ const Header = () => {
     <header className="sticky top-0 w-full bg-white/90 backdrop-blur-sm border-b border-gray-200 z-50">
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2">
-           <Vote className="text-evoting-600 h-10 w-10" />
+           <Vote className="text-evoting-600 h-15 w-15" />
           <img src="/logo.png" alt="The-Evoting Logo" className="h-8 w-auto" />
           <span className="text-2xl font-bold bg-clip-text text-evoting-800">
             The-Evoting
