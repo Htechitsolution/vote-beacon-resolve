@@ -99,30 +99,36 @@ export type Database = {
       }
       profiles: {
         Row: {
+          communications_address: string | null
           company_name: string | null
           created_at: string
           credits: number | null
           email: string
+          ibc_registration_number: string | null
           id: string
           name: string
           role: Database["public"]["Enums"]["user_role"]
           updated_at: string
         }
         Insert: {
+          communications_address?: string | null
           company_name?: string | null
           created_at?: string
           credits?: number | null
           email: string
+          ibc_registration_number?: string | null
           id: string
           name: string
           role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
         }
         Update: {
+          communications_address?: string | null
           company_name?: string | null
           created_at?: string
           credits?: number | null
           email?: string
+          ibc_registration_number?: string | null
           id?: string
           name?: string
           role?: Database["public"]["Enums"]["user_role"]
@@ -167,6 +173,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      subscription_plans: {
+        Row: {
+          created_at: string
+          credits: number
+          description: string
+          id: string
+          name: string
+          price: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          credits: number
+          description: string
+          id?: string
+          name: string
+          price: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          credits?: number
+          description?: string
+          id?: string
+          name?: string
+          price?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       voter_otps: {
         Row: {
