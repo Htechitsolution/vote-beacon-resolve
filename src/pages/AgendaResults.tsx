@@ -549,7 +549,7 @@ const AgendaResults = () => {
                       <TableHead>Reject</TableHead>
                       <TableHead>Abstain</TableHead>
                       <TableHead>Result</TableHead>
-                      <TableHead>Document</TableHead>
+                     
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -558,7 +558,7 @@ const AgendaResults = () => {
                         <TableCell className="font-medium">{result.option_title}</TableCell>
                         <TableCell>{result.approve} ({Math.round(result.approve_percentage)}%)</TableCell>
                         <TableCell>{result.reject} ({Math.round(100 - result.approve_percentage)}%)</TableCell>
-                        <TableCell>{result.abstain}</TableCell>
+                        <TableCell>{result.abstain}({Math.round(100 - result.approve_percentage)}%)</TableCell>
                         <TableCell>
                           <div className="space-y-2">
                             <Progress value={result.approve_percentage} className="h-2" />
@@ -568,21 +568,6 @@ const AgendaResults = () => {
                               <Badge variant="destructive">Failed</Badge>
                             )}
                           </div>
-                        </TableCell>
-                        <TableCell>
-                          {result.file_path && result.file_name ? (
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
-                              onClick={() => handleDownloadFile(result.file_path!, result.file_name!)}
-                              className="flex items-center gap-2"
-                            >
-                              <FileText className="h-4 w-4" />
-                              Download
-                            </Button>
-                          ) : (
-                            <span className="text-gray-400 text-sm">No document</span>
-                          )}
                         </TableCell>
                       </TableRow>
                     ))}

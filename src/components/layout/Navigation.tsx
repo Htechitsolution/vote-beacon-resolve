@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Menu, X, LogOut, User, FileText, LayoutDashboard, IndianRupee } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
+import { Vote as VoteIcon } from "lucide-react";
 
 interface NavLink {
   label: string;
@@ -58,8 +59,8 @@ const Navigation = () => {
       <div className="container mx-auto px-4 flex justify-between items-center h-16">
         <div className="flex items-center gap-2">
           <Link to="/" className="flex items-center gap-2">
-            <img src="/logo.png" alt="The-Evoting Logo" className="h-8 w-auto" />
-            <span className="text-xl font-bold">eVoting Platform</span>
+          <VoteIcon className="text-evoting-600 h-19 w-19" />
+            <span className="text-xl font-bold">The-eVoting</span>
           </Link>
         </div>
         <div className="hidden md:flex items-center space-x-4">

@@ -6,7 +6,6 @@ import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { ArrowDown, CheckCheck, ShieldCheck, Users, FileText, Vote, Check } from "lucide-react";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
-
 import { Vote as VoteIcon } from "lucide-react";
 
 const Index = () => {
@@ -228,21 +227,6 @@ const Index = () => {
                 Join thousands of resolution professionals and organizations who trust The-Evoting
               </p>
               <div className="flex flex-col sm:flex-row justify-center gap-4">
-                <Button 
-                  size="lg" 
-                  className="bg-evoting-600 hover:bg-evoting-700 text-white"
-                  asChild
-                >
-                  <Link to="/login">Admin Login</Link>
-                </Button>
-                <Button 
-                  variant="outline"
-                  size="lg"
-                  className="border-evoting-600 text-evoting-700"
-                  asChild
-                >
-                  <Link to="/voter-login">Voter Login</Link>
-                </Button>
               </div>
             </div>
           </div>
