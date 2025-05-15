@@ -26,6 +26,8 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
+import { format } from "date-fns";
+import { AspectRatio } from "@/components/ui/aspect-ratio";
 
 type Agenda = {
   id: string;
@@ -253,28 +255,56 @@ const AgendaResults = () => {
       const imgWidth = 190;
       const pageHeight = 290;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      let heightLeft = imgHeight;
       let position = 10;
       
-      // Add title and date to PDF
+      // Add logo and header information
+      pdf.setTextColor(0, 0, 255); // blue color for "The-eVoting"
       pdf.setFontSize(16);
-      pdf.text(`${project?.title || 'Project'} - ${agenda?.title || 'Agenda'} Results`, 105, position, { align: 'center' });
-      position += 10;
+      pdf.text("The-eVoting", 15, position + 10);
+      pdf.setTextColor(0, 0, 0); // reset to black
+      
+      if (profile) {
+        // Company name in the center
+        pdf.setFontSize(14);
+        pdf.text(profile.company_name || "", 105, position + 10, { align: 'center' });
+        
+        // Admin name
+        pdf.setFontSize(12);
+        pdf.text(profile.name, 105, position + 18, { align: 'center' });
+        
+        // IBC member code
+        pdf.setFontSize(10);
+        if (profile.ibc_registration_number) {
+          pdf.text(`IBC Member Code: ${profile.ibc_registration_number}`, 105, position + 24, { align: 'center' });
+        }
+        
+        // Address
+        if (profile.communications_address) {
+          pdf.setFontSize(10);
+          pdf.text(profile.communications_address, 105, position + 30, { align: 'center' });
+        }
+        
+        // Line
+        pdf.setDrawColor(0, 0, 0);
+        pdf.line(15, position + 35, 195, position + 35);
+        
+        position += 45;
+      } else {
+        position += 15;
+      }
+      
+      // Meeting name (Project title)
+      pdf.setFontSize(14);
+      pdf.text(`${project?.title || 'Project'}`, 105, position, { align: 'center' });
+      position += 8;
+      
+      // Meeting description - small text
       pdf.setFontSize(10);
-      pdf.text(`Generated on ${new Date().toLocaleDateString()}`, 105, position, { align: 'center' });
-      position += 15;
+      pdf.text(`${agenda?.description || ''}`, 105, position, { align: 'center' });
+      position += 10;
       
       // Add the image to the PDF
       pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-      
-      // Add additional pages if needed
-      while (heightLeft >= 0) {
-        position = 0;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
-      }
       
       // Save the PDF
       pdf.save(`${project?.title || 'Project'}_${agenda?.title || 'Agenda'}_Results.pdf`);
@@ -366,6 +396,11 @@ const AgendaResults = () => {
     }
   };
 
+  const formatDateTime = (dateString: string | null) => {
+    if (!dateString) return "Not set";
+    return format(new Date(dateString), "yyyy-MM-dd HH:mm");
+  };
+
   if (loading) {
     return (
       <div>
@@ -426,6 +461,9 @@ const AgendaResults = () => {
             <div>
               <h1 className="text-3xl font-bold mb-2">{agenda?.title} - Results</h1>
               <p className="text-gray-600">{agenda?.description}</p>
+              <p className="text-gray-600 mt-2">
+                <span className="font-semibold">End Date:</span> {formatDateTime(agenda?.end_date)}
+              </p>
             </div>
             <div className="flex gap-2">
               <Button variant="outline" onClick={generatePDF} className="flex items-center gap-2">
@@ -461,9 +499,41 @@ const AgendaResults = () => {
         </div>
         
         <div ref={resultsRef}>
+          {/* PDF Header - This will only be visible in the PDF, not in the UI */}
+          <div className="hidden">
+            <div className="flex items-start">
+              <div className="w-1/3">
+                <div className="text-blue-600 font-bold text-xl">The-eVoting</div>
+              </div>
+              <div className="w-1/3 text-center">
+                <div className="font-semibold text-lg">{profile?.company_name}</div>
+                <div>{profile?.name}</div>
+                <div className="text-sm">IBC Member Code: {profile?.ibc_registration_number}</div>
+                <div className="text-sm">{profile?.communications_address}</div>
+              </div>
+              <div className="w-1/3"></div>
+            </div>
+            <div className="border-b-2 border-gray-300 my-4"></div>
+            <div className="text-center font-bold text-lg mb-2">{project.title}</div>
+            <div className="text-center text-sm mb-6">{agenda.description}</div>
+          </div>
+          
+          {/* Visible Header with Logo for UI */}
           <Card className="mb-8">
-            <CardHeader>
-              <CardTitle>Voting Results</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 overflow-hidden">
+                  <AspectRatio ratio={1/1} className="bg-blue-600 text-white flex items-center justify-center rounded">
+                    <span className="font-bold text-xs">The-eVoting</span>
+                  </AspectRatio>
+                </div>
+                <div>
+                  <CardTitle>{agenda?.title}</CardTitle>
+                  <div className="text-sm text-muted-foreground">
+                    Voting ended: {formatDateTime(agenda?.end_date)}
+                  </div>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               {results.length === 0 ? (

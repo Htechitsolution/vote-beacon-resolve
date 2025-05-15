@@ -11,6 +11,11 @@ interface OtpRequest {
   email: string;
   name?: string;
   otp: string;
+  projectName?: string;
+  votingLink?: string;
+  isResultEmail?: boolean;
+  resultTitle?: string;
+  resultUrl?: string;
 }
 
 serve(async (req) => {
@@ -28,31 +33,56 @@ serve(async (req) => {
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    const { email, name, otp }: OtpRequest = await req.json();
+    const payload: OtpRequest = await req.json();
+    const { email, name, otp, projectName, votingLink, isResultEmail, resultTitle, resultUrl } = payload;
 
-    if (!email || !otp) {
-      throw new Error("Email and OTP are required");
+    if (!email) {
+      throw new Error("Email is required");
     }
 
-    console.log(`Processing OTP email to ${email}`);
-
     const voterName = name || "Voter";
-    const subject = "Your One-Time Password for eVoting";
-    const body = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
-        <h2 style="color: #1a73e8;">Your One-Time Password (OTP)</h2>
-        <p>Hello ${voterName},</p>
-        <p>Please use the following OTP to login to the eVoting portal:</p>
-        <div style="background-color: #f5f5f5; padding: 15px; border-radius: 4px; font-size: 24px; font-weight: bold; text-align: center; letter-spacing: 5px; margin: 20px 0;">
-          ${otp}
+    let subject, body;
+
+    if (isResultEmail) {
+      subject = `Results for ${resultTitle || projectName || "Your Meeting"}`;
+      body = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
+          <h2 style="color: #1a73e8;">Meeting Results Available</h2>
+          <p>Hello ${voterName},</p>
+          <p>The results for "${resultTitle || "your meeting"}" are now available.</p>
+          <p>You can view the results by clicking the button below:</p>
+          <div style="text-align: center; margin: 25px 0;">
+            <a href="${resultUrl}" style="background-color: #1a73e8; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; font-weight: bold;">View Results</a>
+          </div>
+          <p>If you have any questions, please contact the meeting administrator.</p>
+          <p style="margin-top: 30px; font-size: 12px; color: #666;">
+            This is an automated message, please do not reply to this email.
+          </p>
         </div>
-        <p>This OTP will expire in 30 minutes.</p>
-        <p>If you did not request this OTP, please ignore this email.</p>
-        <p style="margin-top: 30px; font-size: 12px; color: #666;">
-          This is an automated message, please do not reply to this email.
-        </p>
-      </div>
-    `;
+      `;
+    } else {
+      if (!otp) {
+        throw new Error("OTP is required");
+      }
+      
+      subject = `Your One-Time Password for ${projectName || "eVoting"}`;
+      body = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
+          <h2 style="color: #1a73e8;">Your One-Time Password (OTP)</h2>
+          <p>Hello ${voterName},</p>
+          <p>Please use the following OTP to login to the ${projectName || "eVoting"} portal:</p>
+          <div style="background-color: #f5f5f5; padding: 15px; border-radius: 4px; font-size: 24px; font-weight: bold; text-align: center; letter-spacing: 5px; margin: 20px 0;">
+            ${otp}
+          </div>
+          <p>This OTP will expire in 15 minutes.</p>
+          ${votingLink ? `<p>To access the voting portal, <a href="${votingLink}" style="color: #1a73e8; text-decoration: none;">click here</a>.</p>` : ''}
+          <p>If you did not request this OTP, please ignore this email.</p>
+          <p style="margin-top: 30px; font-size: 12px; color: #666;">
+            This is an automated message, please do not reply to this email.
+          </p>
+        </div>
+      `;
+    }
 
     // Call the email-service function to send the email
     const { data: emailData, error: emailError } = await supabase.functions.invoke("email-service", {
@@ -60,7 +90,7 @@ serve(async (req) => {
         to: email,
         subject: subject,
         body: body,
-        type: "voter_otp",
+        type: isResultEmail ? "voting_results" : "voter_otp",
       },
     });
 
@@ -71,19 +101,19 @@ serve(async (req) => {
     console.log("Email sent successfully:", emailData);
 
     return new Response(
-      JSON.stringify({ success: true, message: "OTP sent successfully" }),
+      JSON.stringify({ success: true, message: isResultEmail ? "Results email sent successfully" : "OTP sent successfully" }),
       {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
   } catch (error) {
-    console.error("Error sending OTP:", error);
+    console.error("Error sending email:", error);
     
     return new Response(
       JSON.stringify({ 
         success: false, 
-        message: error.message || "Failed to send OTP" 
+        message: error.message || "Failed to send email" 
       }),
       {
         status: 500,

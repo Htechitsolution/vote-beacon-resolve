@@ -55,8 +55,8 @@ function App() {
         </Route>
         
         {/* Voter routes */}
-        <Route path="/voter-login" element={<VoterLoginPage />} />
-        <Route path="/voter-dashboard" element={<VoterDashboardPage />} />
+        <Route path="/projects/:projectId/voter-login" element={<VoterLoginPage />} />
+        <Route path="/projects/:projectId/voter-dashboard" element={<VoterDashboardPage />} />
         <Route path="/voter/meeting/:projectId/:agendaId" element={<VoterMeetingPage />} />
         
         <Route path="*" element={<NotFoundPage />} />
