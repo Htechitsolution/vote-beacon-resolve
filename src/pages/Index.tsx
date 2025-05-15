@@ -7,6 +7,8 @@ import Footer from "@/components/layout/Footer";
 import { ArrowDown, CheckCheck, ShieldCheck, Users, FileText, Vote, Check } from "lucide-react";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 
+import { Vote as VoteIcon } from "lucide-react";
+
 const Index = () => {
   return (
     <div className="flex flex-col min-h-screen">
@@ -18,11 +20,7 @@ const Index = () => {
           <div className="container mx-auto px-4 py-20 md:py-32">
             <div className="grid md:grid-cols-2 gap-12 items-center">
               <div className="text-left">
-                <img 
-                  src="/logo.png" 
-                  alt="The-Evoting Logo" 
-                  className="h-16 mb-8 animate-fade-in" 
-                />
+                 <VoteIcon className="text-white h-20 w-20 animate-fade-in" />
                 <h1 className="text-4xl md:text-6xl font-bold mb-6 animate-fade-in">
                   Secure E-Voting Solutions for Resolution Professionals
                 </h1>
@@ -30,21 +28,8 @@ const Index = () => {
                   Streamline voting processes for CoC members under IBC, clubs, societies, and more with our trusted platform
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4">
-                  <Button 
-                    size="lg" 
-                    className="bg-white text-evoting-800 hover:bg-gray-100"
-                    asChild
-                  >
-                    <Link to="/login">Admin Login</Link>
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="lg" 
-                    className="border-white text-white hover:bg-white/10"
-                    asChild
-                  >
-                    <Link to="/voter-login">Voter Login</Link>
-                  </Button>
+                 
+                 
                 </div>
               </div>
               <div className="hidden md:block">

@@ -12,8 +12,7 @@ const Header = () => {
     <header className="sticky top-0 w-full bg-white/90 backdrop-blur-sm border-b border-gray-200 z-50">
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2">
-           <VoteIcon className="text-evoting-600 h-15 w-15" />
-          <img src="/logo.png" alt="The-Evoting Logo" className="h-8 w-auto" />
+           <VoteIcon className="text-evoting-600 h-19 w-19" />
           <span className="text-2xl font-bold bg-clip-text text-evoting-800">
             The-Evoting
           </span>
@@ -21,18 +20,23 @@ const Header = () => {
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center gap-6">
-          <Button 
-            variant="ghost"
-            onClick={() => navigate("/voter-login")}
-          >
-            Voter Login
-          </Button>
-          <Button 
+         
+          <Button
             variant="outline"
-            onClick={() => navigate("/login")}
+            size="lg"
+            className="border-evoting-600 text-evoting-700"
+            asChild
           >
-            Admin Login
+            <Link to="/voter-login">Voter Login</Link>
           </Button>
+ <Button
+            size="lg"
+            className="bg-evoting-600 hover:bg-evoting-700 text-white"
+            asChild
+          >
+            <Link to="/login">Admin Login</Link>
+          </Button>
+          
         </nav>
 
         {/* Mobile Menu Button */}
