@@ -98,8 +98,6 @@ const VoterLogin = () => {
       
       if (otpError) throw otpError;
       
-      console.log("Generated OTP:", generatedOtp);
-      
       // Prepare the voting link - this will be used in the email
       const votingLink = `${window.location.origin}/projects/${projectId}/voter-login`;
       
