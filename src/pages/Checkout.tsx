@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/components/ui/use-toast';
 import Navigation from '@/components/layout/Navigation';
-import { CreditCard, IndianRupee } from 'lucide-react';
+import { CreditCard, IndianRupee, Check } from 'lucide-react';
 import { supabase } from "@/integrations/supabase/client";
 import {
   Breadcrumb,
