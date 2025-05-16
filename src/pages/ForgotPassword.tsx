@@ -26,21 +26,37 @@ const ForgotPassword = () => {
     try {
       setIsLoading(true);
       
+      console.log("Sending reset password request for:", email);
+      
       // First, use Supabase's built-in reset password function
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`,
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase reset password error:", error);
+        throw error;
+      }
+      
+      console.log("Supabase reset password request successful, now sending custom email");
       
       // Also send a custom email via our edge function
       try {
-        await supabase.functions.invoke('reset-password', {
+        const resetLink = `${window.location.origin}/reset-password?email=${encodeURIComponent(email)}`;
+        console.log("Calling reset-password edge function with link:", resetLink);
+        
+        const { data, error: functionError } = await supabase.functions.invoke('reset-password', {
           body: { 
             email, 
-            resetLink: `${window.location.origin}/reset-password?email=${encodeURIComponent(email)}` 
+            resetLink
           }
         });
+        
+        if (functionError) {
+          console.error("Edge function error:", functionError);
+        } else {
+          console.log("Edge function response:", data);
+        }
       } catch (emailError) {
         console.error("Error sending custom email:", emailError);
         // We don't throw here as the Supabase reset already worked

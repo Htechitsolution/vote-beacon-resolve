@@ -23,16 +23,16 @@ serve(async (req) => {
     const email_password = Deno.env.get("EMAIL_PASSWORD");
 
     if (!email_user || !email_password) {
-      console.error("Missing email credentials");
+      console.error("Missing email credentials", { user: email_user ? "set" : "missing", password: email_password ? "set" : "missing" });
       throw new Error("Email service credentials not configured");
     }
 
     const payload: ResetPasswordPayload = await req.json();
     const { email, resetLink } = payload;
 
-    console.log(`Sending password reset email to ${email}`);
+    console.log(`Sending password reset email to ${email} with link ${resetLink}`);
 
-    // Setup SMTP client
+    // Setup SMTP client with more detailed configuration
     const client = new SMTPClient({
       connection: {
         hostname: "smtp.gmail.com",
@@ -43,6 +43,7 @@ serve(async (req) => {
           password: email_password,
         },
       },
+      debug: true, // Enable debug logging
     });
 
     // HTML email template
@@ -62,16 +63,23 @@ serve(async (req) => {
       </div>
     `;
 
-    // Send the email
-    await client.send({
-      from: `The-eVoting <${email_user}>`,
-      to: email,
-      subject: "Password Reset Request",
-      content: "text/html",
-      html: htmlBody,
-    });
-
-    await client.close();
+    try {
+      // Send the email
+      console.log("Sending email...");
+      const sendResult = await client.send({
+        from: `The-eVoting <${email_user}>`,
+        to: email,
+        subject: "Password Reset Request",
+        content: "text/html",
+        html: htmlBody,
+      });
+      console.log("Email send result:", sendResult);
+    } catch (emailError) {
+      console.error("SMTP error details:", emailError);
+      throw emailError;
+    } finally {
+      await client.close();
+    }
 
     console.log(`Successfully sent password reset email to ${email}`);
 

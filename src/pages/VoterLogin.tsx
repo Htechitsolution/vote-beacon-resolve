@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -11,7 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 import { HelpCircle, Mail, RefreshCw, Send } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import Header from "@/components/layout/Header";
@@ -20,6 +20,7 @@ import Footer from "@/components/layout/Footer";
 const VoterLogin = () => {
   const navigate = useNavigate();
   const { projectId } = useParams();
+  const location = useLocation();
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
   const [showOtpInput, setShowOtpInput] = useState(false);
@@ -29,26 +30,31 @@ const VoterLogin = () => {
   
   useEffect(() => {
     const fetchProjectName = async () => {
-      if (!projectId) return;
+      if (!projectId) {
+        console.log("No projectId provided, cannot fetch project");
+        return;
+      }
       
       try {
+        console.log("Fetching project data for:", projectId);
         const { data, error } = await supabase
           .from('projects')
           .select('title')
           .eq('id', projectId)
           .single();
           
-        if (error) throw error;
+        if (error) {
+          console.error("Error fetching project:", error);
+          throw error;
+        }
         
         if (data) {
+          console.log("Project data retrieved:", data);
           setProjectName(data.title);
         }
       } catch (error: any) {
         console.error("Error fetching project:", error.message);
-        toast({
-          title: "Error",
-          description: "Failed to load project information",
-        });
+        toast.error("Failed to load project information");
       }
     };
     
@@ -57,16 +63,19 @@ const VoterLogin = () => {
   
   const handleSendOTP = async () => {
     if (!email) {
-      toast({
-        title: "Error",
-        description: "Please enter your email address",
-        variant: "destructive"
-      });
+      toast.error("Please enter your email address");
+      return;
+    }
+    
+    if (!projectId) {
+      toast.error("Project ID is missing. Please check the URL");
+      console.error("Project ID is missing - current projectId:", projectId);
       return;
     }
     
     try {
       setSendingOtp(true);
+      console.log("Sending OTP for email:", email, "projectId:", projectId);
       
       // Check if voter exists with given email
       const { data: voterData, error: voterError } = await supabase
@@ -77,7 +86,8 @@ const VoterLogin = () => {
         .single();
         
       if (voterError) {
-        if (voterError.message.includes('No rows found')) {
+        console.error("Voter error:", voterError);
+        if (voterError.code === 'PGRST116') {
           throw new Error('No voter found with this email address');
         }
         throw voterError;
@@ -90,6 +100,8 @@ const VoterLogin = () => {
       const expiresAt = new Date();
       expiresAt.setMinutes(expiresAt.getMinutes() + 15);
       
+      console.log("Storing OTP for voter:", voterData.id);
+      
       // Store the OTP in the voter_otps table
       const { error: otpError } = await supabase.rpc('create_voter_otp', {
         v_voter_id: voterData.id,
@@ -98,17 +110,22 @@ const VoterLogin = () => {
         v_expires_at: expiresAt.toISOString()
       });
       
-      if (otpError) throw otpError;
+      if (otpError) {
+        console.error("OTP storage error:", otpError);
+        throw otpError;
+      }
       
       // Prepare the voting link - this will be used in the email
       const votingLink = `${window.location.origin}/projects/${projectId}/voter-login`;
       
+      console.log("Sending OTP via edge function");
+      
       // Send OTP via email using our edge function
-      const { error: functionError } = await supabase.functions.invoke('send-voter-otp', {
+      const { data, error: functionError } = await supabase.functions.invoke('send-voter-otp', {
         body: { 
           email: email,
           otp: generatedOtp,
-          voterName: voterData.name,
+          name: voterData.name,
           projectName: projectName,
           votingLink: votingLink
         }
@@ -119,19 +136,14 @@ const VoterLogin = () => {
         throw functionError;
       }
       
+      console.log("OTP sent response:", data);
+      
       setShowOtpInput(true);
-      toast({
-        title: "OTP Sent",
-        description: "A one-time password has been sent to your email"
-      });
+      toast.success("A one-time password has been sent to your email");
       
     } catch (error: any) {
       console.error("Error sending OTP:", error.message);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to send OTP. Please try again.",
-        variant: "destructive"
-      });
+      toast.error(error.message || "Failed to send OTP. Please try again.");
     } finally {
       setSendingOtp(false);
     }
@@ -139,11 +151,12 @@ const VoterLogin = () => {
   
   const handleVerifyOTP = async () => {
     if (!email || !otp) {
-      toast({
-        title: "Error",
-        description: "Please enter your email and OTP",
-        variant: "destructive"
-      });
+      toast.error("Please enter your email and OTP");
+      return;
+    }
+    
+    if (!projectId) {
+      toast.error("Project ID is missing. Please check the URL");
       return;
     }
     
@@ -193,18 +206,11 @@ const VoterLogin = () => {
       // Redirect to voter dashboard
       navigate(`/projects/${projectId}/voter-dashboard`);
       
-      toast({
-        title: "Success",
-        description: "Login successful!"
-      });
+      toast.success("Login successful!");
       
     } catch (error: any) {
       console.error("Login error:", error.message);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to login. Please try again.",
-        variant: "destructive"
-      });
+      toast.error(error.message || "Failed to login. Please try again.");
     } finally {
       setLoading(false);
     }

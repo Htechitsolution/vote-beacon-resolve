@@ -27,8 +27,14 @@ const Index = () => {
                   Streamline voting processes for CoC members under IBC, clubs, societies, and more with our trusted platform
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4">
-                 
-                 
+                  <Button asChild size="lg" className="bg-white text-evoting-800 hover:bg-gray-100">
+                    <Link to="/login">Admin Login</Link>
+                  </Button>
+                  <Button asChild variant="outline" size="lg" className="border-white text-white hover:bg-white/20">
+                    <Link to="/projects/:projectId/voter-login" state={{ isVoterPage: true }}>
+                      Voter Access
+                    </Link>
+                  </Button>
                 </div>
               </div>
               <div className="hidden md:block">
@@ -227,6 +233,12 @@ const Index = () => {
                 Join thousands of resolution professionals and organizations who trust The-Evoting
               </p>
               <div className="flex flex-col sm:flex-row justify-center gap-4">
+                <Button asChild size="lg" className="bg-evoting-600 hover:bg-evoting-700 text-white">
+                  <Link to="/register">Get Started</Link>
+                </Button>
+                <Button asChild variant="outline" size="lg">
+                  <Link to="/projects/:projectId/voter-login">Voter Login</Link>
+                </Button>
               </div>
             </div>
           </div>

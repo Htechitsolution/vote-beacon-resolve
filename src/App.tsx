@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from '@/components/ui/toaster';
 import { AuthProvider } from '@/contexts/AuthContext';
 import ProfilePage from './pages/Profile';
@@ -37,6 +37,9 @@ function App() {
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/contact-us" element={<ContactUsPage />} />
         <Route path="/checkout" element={<CheckoutPage />} />
+        
+        {/* Voter login fallback route */}
+        <Route path="/voter-login" element={<Navigate to="/" replace />} />
         
         {/* Protected routes */}
         <Route element={<ProtectedRoute />}>

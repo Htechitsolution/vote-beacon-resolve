@@ -25,16 +25,21 @@ serve(async (req) => {
   }
 
   try {
+    console.log("Received OTP request");
+    
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
     if (!supabaseUrl || !supabaseServiceKey) {
+      console.error("Missing Supabase environment variables");
       throw new Error("Missing Supabase environment variables");
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const payload: OtpRequest = await req.json();
     const { email, name, otp, projectName, votingLink, isResultEmail, resultTitle, resultUrl } = payload;
+
+    console.log("OTP request payload:", { email, name: name || "not provided", otp: otp ? "provided" : "missing", projectName, votingLink: votingLink ? "provided" : "missing" });
 
     if (!email) {
       throw new Error("Email is required");
@@ -84,6 +89,8 @@ serve(async (req) => {
       `;
     }
 
+    console.log("Calling email-service function");
+
     // Call the email-service function to send the email
     const { data: emailData, error: emailError } = await supabase.functions.invoke("email-service", {
       body: {
@@ -95,6 +102,7 @@ serve(async (req) => {
     });
 
     if (emailError) {
+      console.error("Email service error:", emailError);
       throw emailError;
     }
 

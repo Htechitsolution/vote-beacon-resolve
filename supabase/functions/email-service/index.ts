@@ -28,7 +28,7 @@ serve(async (req) => {
     const email_password = Deno.env.get("EMAIL_PASSWORD");
 
     if (!email_user || !email_password) {
-      console.error("Missing email credentials");
+      console.error("Missing email credentials", { user: email_user ? "set" : "missing", password: email_password ? "set" : "missing" });
       throw new Error("Email service credentials not configured");
     }
 
@@ -37,7 +37,7 @@ serve(async (req) => {
 
     console.log(`Processing ${type} email to ${to}`);
 
-    // Setup SMTP client
+    // Setup SMTP client with more detailed configuration
     const client = new SMTPClient({
       connection: {
         hostname: "smtp.gmail.com",
@@ -48,10 +48,11 @@ serve(async (req) => {
           password: email_password,
         },
       },
+      debug: true, // Enable debug logging
     });
 
     // Send the email
-    await client.send({
+    const emailResult = await client.send({
       from: `The-eVoting <${email_user}>`,
       to: to,
       subject: subject,
@@ -62,7 +63,7 @@ serve(async (req) => {
 
     await client.close();
 
-    console.log(`Successfully sent ${type} email to ${to}`);
+    console.log(`Successfully sent ${type} email to ${to}`, emailResult);
 
     return new Response(JSON.stringify({
       success: true,
@@ -77,7 +78,8 @@ serve(async (req) => {
     
     return new Response(JSON.stringify({
       success: false,
-      message: error.message || "Failed to send email"
+      message: error.message || "Failed to send email",
+      error: JSON.stringify(error)
     }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" }
