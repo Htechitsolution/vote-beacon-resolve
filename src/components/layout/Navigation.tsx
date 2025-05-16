@@ -4,7 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Menu, X, LogOut, User, FileText, LayoutDashboard, IndianRupee } from "lucide-react";
+import { Menu, X, LogOut, User, LayoutDashboard, IndianRupee } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import { Vote as VoteIcon } from "lucide-react";
 

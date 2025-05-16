@@ -9,22 +9,51 @@ import Footer from "@/components/layout/Footer";
 import { useAuth } from "@/contexts/AuthContext";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
-  const { resetPassword, isLoading } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!email) {
+      toast.error("Please enter your email address");
+      return;
+    }
+    
     try {
-      await resetPassword(email);
-      // For now, show success message even if the actual email sending fails
-      // This allows testing the flow until the email service is properly configured
+      setIsLoading(true);
+      
+      // First, use Supabase's built-in reset password function
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (error) throw error;
+      
+      // Also send a custom email via our edge function
+      try {
+        await supabase.functions.invoke('reset-password', {
+          body: { 
+            email, 
+            resetLink: `${window.location.origin}/reset-password?email=${encodeURIComponent(email)}` 
+          }
+        });
+      } catch (emailError) {
+        console.error("Error sending custom email:", emailError);
+        // We don't throw here as the Supabase reset already worked
+      }
+      
       setSubmitted(true);
-    } catch (error) {
-      // Error is already handled in AuthContext, just log it here
+      toast.success("Password reset instructions sent to your email");
+      
+    } catch (error: any) {
       console.error("Password reset error:", error);
+      toast.error(error.message || "Failed to send reset instructions");
+    } finally {
+      setIsLoading(false);
     }
   };
 

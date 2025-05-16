@@ -4,3 +4,7 @@ project_id = "crnpusxrbjozxdeeaotw"
 verify_jwt = false
 [functions.email-service]
 verify_jwt = false
+[functions.reset-password]
+verify_jwt = false
+[functions.send-contact-email]
+verify_jwt = false

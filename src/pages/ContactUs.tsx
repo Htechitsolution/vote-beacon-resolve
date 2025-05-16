@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,13 +46,7 @@ const ContactUs = () => {
       setMessage("");
     } catch (error: any) {
       console.error("Error sending message:", error.message);
-      // Show success message even if there's an error to allow testing the flow
-      // until the email sending is properly configured
-      toast.success("Message received! We'll get back to you soon.");
-      setSubmitted(true);
-      setName("");
-      setEmail("");
-      setMessage("");
+      toast.error(error.message || "Failed to send message. Please try again later.");
     } finally {
       setIsSubmitting(false);
     }

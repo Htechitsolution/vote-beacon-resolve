@@ -14,6 +14,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 import { HelpCircle, Mail, RefreshCw, Send } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import Header from "@/components/layout/Header";
+import Footer from "@/components/layout/Footer";
 
 const VoterLogin = () => {
   const navigate = useNavigate();
@@ -213,111 +215,118 @@ const VoterLogin = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-evoting-50 to-evoting-100 flex items-center justify-center p-4"
-         style={{
-           backgroundImage: "url('https://images.unsplash.com/photo-1541435469116-8ce8ccc4ff85?q=80&w=1976&auto=format&fit=crop&ixlib=rb-4.0.3')",
-           backgroundSize: "cover",
-           backgroundPosition: "center"
-         }}>
-      <div className="absolute inset-0 bg-black bg-opacity-50 backdrop-blur-sm"></div>
+    <div className="flex flex-col min-h-screen">
+      <Header />
       
-      <Card className="w-full max-w-md shadow-xl border-0 relative">
-        <CardHeader className="space-y-1 pb-4 text-center">
-          <CardTitle className="text-2xl font-bold text-evoting-800">Voter Login</CardTitle>
-          <CardDescription>
-            {projectName ? `Enter your credentials for ${projectName}` : 'Enter your voter credentials'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label htmlFor="email" className="text-sm font-medium text-gray-700">Email</label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 h-4 w-4" />
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="Enter your email"
-                  className="pl-10"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-            
-            <div className="flex justify-end">
-              <Button
-                type="button"
-                variant={showOtpInput ? "outline" : "default"}
-                className={`w-full ${showOtpInput ? "bg-gray-100 hover:bg-gray-200 text-gray-700" : "bg-evoting-600 hover:bg-evoting-700 text-white"}`}
-                onClick={handleSendOTP}
-                disabled={sendingOtp || !email}
-              >
-                {sendingOtp ? (
-                  <>
-                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                    Sending...
-                  </>
-                ) : showOtpInput ? (
-                  <>
-                    <RefreshCw className="mr-2 h-4 w-4" />
-                    Resend OTP
-                  </>
-                ) : (
-                  <>
-                    <Send className="mr-2 h-4 w-4" />
-                    Send OTP
-                  </>
-                )}
-              </Button>
-            </div>
-            
-            {showOtpInput && (
-              <div className="space-y-4 pt-4 border-t border-gray-100">
-                <div className="space-y-2">
-                  <label htmlFor="otp" className="text-sm font-medium text-gray-700">One-Time Password</label>
-                  <div className="flex justify-center">
-                    <InputOTP maxLength={6} value={otp} onChange={setOtp}>
-                      <InputOTPGroup>
-                        <InputOTPSlot index={0} className="h-12 w-12" />
-                        <InputOTPSlot index={1} className="h-12 w-12" />
-                        <InputOTPSlot index={2} className="h-12 w-12" />
-                        <InputOTPSlot index={3} className="h-12 w-12" />
-                        <InputOTPSlot index={4} className="h-12 w-12" />
-                        <InputOTPSlot index={5} className="h-12 w-12" />
-                      </InputOTPGroup>
-                    </InputOTP>
-                  </div>
+      <div className="flex-grow flex items-center justify-center p-4"
+           style={{
+             backgroundImage: "url('https://images.unsplash.com/photo-1541435469116-8ce8ccc4ff85?q=80&w=1976&auto=format&fit=crop&ixlib=rb-4.0.3')",
+             backgroundSize: "cover",
+             backgroundPosition: "center",
+             position: "relative"
+           }}>
+        <div className="absolute inset-0 bg-black bg-opacity-50 backdrop-blur-sm"></div>
+        
+        <Card className="w-full max-w-md shadow-xl border-0 relative">
+          <CardHeader className="space-y-1 pb-4 text-center">
+            <CardTitle className="text-2xl font-bold text-evoting-800">Voter Login</CardTitle>
+            <CardDescription>
+              {projectName ? `Enter your credentials for ${projectName}` : 'Enter your voter credentials'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label htmlFor="email" className="text-sm font-medium text-gray-700">Email</label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 h-4 w-4" />
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="Enter your email"
+                    className="pl-10"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
                 </div>
-                
+              </div>
+              
+              <div className="flex justify-end">
                 <Button
                   type="button"
-                  className="w-full bg-evoting-600 hover:bg-evoting-700 text-white"
-                  onClick={handleVerifyOTP}
-                  disabled={loading || otp.length !== 6}
+                  variant={showOtpInput ? "outline" : "default"}
+                  className={`w-full ${showOtpInput ? "bg-gray-100 hover:bg-gray-200 text-gray-700" : "bg-evoting-600 hover:bg-evoting-700 text-white"}`}
+                  onClick={handleSendOTP}
+                  disabled={sendingOtp || !email}
                 >
-                  {loading ? "Verifying..." : "Verify & Login"}
+                  {sendingOtp ? (
+                    <>
+                      <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                      Sending...
+                    </>
+                  ) : showOtpInput ? (
+                    <>
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      Resend OTP
+                    </>
+                  ) : (
+                    <>
+                      <Send className="mr-2 h-4 w-4" />
+                      Send OTP
+                    </>
+                  )}
                 </Button>
               </div>
-            )}
-          </div>
-          
-          <div className="mt-4 pt-4 border-t border-gray-100 text-center">
-            <p className="text-sm text-gray-600">
-              <HelpCircle className="inline-block mr-1 h-4 w-4" />
-              Having trouble logging in? Contact your meeting administrator
-            </p>
-            <Button
-              variant="ghost"
-              className="mt-2 text-evoting-600"
-              onClick={handleGoBack}
-            >
-              Back to Home
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+              
+              {showOtpInput && (
+                <div className="space-y-4 pt-4 border-t border-gray-100">
+                  <div className="space-y-2">
+                    <label htmlFor="otp" className="text-sm font-medium text-gray-700">One-Time Password</label>
+                    <div className="flex justify-center">
+                      <InputOTP maxLength={6} value={otp} onChange={setOtp}>
+                        <InputOTPGroup>
+                          <InputOTPSlot index={0} className="h-12 w-12" />
+                          <InputOTPSlot index={1} className="h-12 w-12" />
+                          <InputOTPSlot index={2} className="h-12 w-12" />
+                          <InputOTPSlot index={3} className="h-12 w-12" />
+                          <InputOTPSlot index={4} className="h-12 w-12" />
+                          <InputOTPSlot index={5} className="h-12 w-12" />
+                        </InputOTPGroup>
+                      </InputOTP>
+                    </div>
+                  </div>
+                  
+                  <Button
+                    type="button"
+                    className="w-full bg-evoting-600 hover:bg-evoting-700 text-white"
+                    onClick={handleVerifyOTP}
+                    disabled={loading || otp.length !== 6}
+                  >
+                    {loading ? "Verifying..." : "Verify & Login"}
+                  </Button>
+                </div>
+              )}
+            </div>
+            
+            <div className="mt-4 pt-4 border-t border-gray-100 text-center">
+              <p className="text-sm text-gray-600">
+                <HelpCircle className="inline-block mr-1 h-4 w-4" />
+                Having trouble logging in? Contact your meeting administrator
+              </p>
+              <Button
+                variant="ghost"
+                className="mt-2 text-evoting-600"
+                onClick={handleGoBack}
+              >
+                Back to Home
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+      
+      <Footer />
     </div>
   );
 };

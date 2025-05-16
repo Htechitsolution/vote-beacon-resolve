@@ -50,7 +50,6 @@ function App() {
         
         {/* Super admin routes */}
         <Route element={<SuperAdminRoute />}>
-          <Route path="/super-admin" element={<AdminDashboardPage />} />
           <Route path="/admin-dashboard" element={<AdminDashboardPage />} />
         </Route>
         

@@ -35,8 +35,8 @@ const Index = () => {
                 <div className="bg-white/20 backdrop-blur-sm rounded-lg p-6 shadow-xl">
                   <AspectRatio ratio={16 / 9}>
                     <img 
-                      src="/evoting-demo.jpg" 
-                      alt="E-Voting Platform Demo" 
+                      src="https://images.unsplash.com/photo-1541435469116-8ce8ccc4ff85?q=80&w=1976&auto=format&fit=crop&ixlib=rb-4.0.3" 
+                      alt="Meeting in conference room" 
                       className="rounded-md object-cover w-full h-full"
                     />
                   </AspectRatio>
