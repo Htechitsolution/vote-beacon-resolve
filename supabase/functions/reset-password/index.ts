@@ -1,6 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { SMTPClient } from "https://deno.land/x/smtp@v0.7.0/mod.ts";
+import { SmtpClient } from "https://deno.land/x/smtp@v0.7.0/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -33,7 +33,7 @@ serve(async (req) => {
     console.log(`Sending password reset email to ${email} with link ${resetLink}`);
 
     // Setup SMTP client with more detailed configuration
-    const client = new SMTPClient({
+    const client = new SmtpClient({
       connection: {
         hostname: "smtp.gmail.com",
         port: 587,

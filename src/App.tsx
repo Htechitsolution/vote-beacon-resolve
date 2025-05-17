@@ -38,8 +38,9 @@ function App() {
         <Route path="/contact-us" element={<ContactUsPage />} />
         <Route path="/checkout" element={<CheckoutPage />} />
         
-        {/* Voter login fallback route */}
-        <Route path="/voter-login" element={<Navigate to="/" replace />} />
+        {/* Voter login routes */}
+        <Route path="/voter-login" element={<VoterLoginPage />} />
+        <Route path="/projects/:projectId/voter-login" element={<VoterLoginPage />} />
         
         {/* Protected routes */}
         <Route element={<ProtectedRoute />}>
@@ -57,7 +58,6 @@ function App() {
         </Route>
         
         {/* Voter routes */}
-        <Route path="/projects/:projectId/voter-login" element={<VoterLoginPage />} />
         <Route path="/projects/:projectId/voter-dashboard" element={<VoterDashboardPage />} />
         <Route path="/voter/meeting/:projectId/:agendaId" element={<VoterMeetingPage />} />
         

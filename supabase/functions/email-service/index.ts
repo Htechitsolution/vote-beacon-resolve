@@ -1,6 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { SMTPClient } from "https://deno.land/x/smtp@v0.7.0/mod.ts";
+import { SmtpClient } from "https://deno.land/x/smtp@v0.7.0/mod.ts";
 
 // Define CORS headers
 const corsHeaders = {
@@ -38,7 +38,7 @@ serve(async (req) => {
     console.log(`Processing ${type} email to ${to}`);
 
     // Setup SMTP client with more detailed configuration
-    const client = new SMTPClient({
+    const client = new SmtpClient({
       connection: {
         hostname: "smtp.gmail.com",
         port: 587,
