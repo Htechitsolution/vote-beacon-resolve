@@ -104,7 +104,7 @@ const ExportResultsButton = ({ projectId, className }: ExportResultsButtonProps)
           id: vote.voter.id,
           name: vote.voter.name || "Anonymous",
           email: vote.voter.email,
-          votingWeight: parseFloat(vote.voting_weight) || 1,
+          votingWeight: vote.voting_weight ? parseFloat(vote.voting_weight) : 1,
           vote: vote.value || "Unknown",
           votedAt: vote.created_at
         }));
