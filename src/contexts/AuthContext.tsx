@@ -18,6 +18,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   isSuper: boolean;
   resetPassword: (email: string) => Promise<void>;
+  updateProfile: (updates: Partial<Profile>) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -79,6 +80,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error: any) {
       console.error('Error fetching profile:', error.message);
       setProfile(null);
+    }
+  };
+
+  const updateProfile = async (updates: Partial<Profile>) => {
+    if (!user) throw new Error('No user logged in');
+    
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update(updates)
+        .eq('id', user.id);
+      
+      if (error) throw error;
+      
+      // Refresh profile data
+      fetchProfile(user.id);
+    } catch (error: any) {
+      console.error('Error updating profile:', error.message);
+      throw error;
     }
   };
 
@@ -187,7 +207,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       signUp, 
       signOut,
       isSuper,
-      resetPassword
+      resetPassword,
+      updateProfile
     }}>
       {children}
     </AuthContext.Provider>

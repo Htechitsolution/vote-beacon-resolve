@@ -7,6 +7,7 @@ export interface SubscriptionPlan {
   description: string;
   price: number;
   credits: number;
+  validity_days?: number | null; // Optional validity in days
 }
 
 // Get all subscription plans
