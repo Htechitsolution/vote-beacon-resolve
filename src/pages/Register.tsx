@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 const Register = () => {
   const navigate = useNavigate();
@@ -21,6 +22,7 @@ const Register = () => {
     confirmPassword: "",
     agreeTerms: false
   });
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     // Redirect to projects if already logged in
@@ -56,7 +58,33 @@ const Register = () => {
       return;
     }
 
-    await signUp(formData.email, formData.password, formData.name, formData.companyName);
+    setSubmitting(true);
+    
+    // Check if user already exists
+    const { data: existingUser, error: checkError } = await supabase
+      .from('profiles')
+      .select('email')
+      .eq('email', formData.email)
+      .single();
+      
+    if (existingUser) {
+      toast.error("An account with this email already exists");
+      setSubmitting(false);
+      return;
+    }
+    
+    try {
+      await signUp(formData.email, formData.password, formData.name, formData.companyName);
+    } catch (error: any) {
+      // Check for Supabase's "User already registered" error
+      if (error.message?.includes("User already registered")) {
+        toast.error("An account with this email already exists");
+      } else {
+        toast.error(error.message || "Registration failed");
+      }
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -160,9 +188,9 @@ const Register = () => {
             <Button 
               type="submit"
               className="w-full bg-evoting-600 hover:bg-evoting-700 text-white"
-              disabled={isLoading}
+              disabled={isLoading || submitting}
             >
-              {isLoading ? "Creating account..." : "Create Account"}
+              {isLoading || submitting ? "Creating account..." : "Create Account"}
             </Button>
           </form>
           

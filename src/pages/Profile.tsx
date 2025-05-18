@@ -1,224 +1,129 @@
-
-import React, { useState, useEffect } from "react";
-import { useAuth } from "@/contexts/AuthContext";
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { User, Mail, Building, Calendar } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
-import Navigation from "@/components/layout/Navigation";
+import { Link } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import * as z from "zod";
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import { useAuth } from '@/contexts/AuthContext';
+import Header from '@/components/layout/Header';
+import Footer from '@/components/layout/Footer';
 
-const profileFormSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  company_name: z.string().optional(),
-  ibc_registration_number: z.string().optional(),
-  communications_address: z.string().optional(),
-});
+const ProfilePage = () => {
+  const navigate = useNavigate();
+  const { user, profile, updateProfile } = useAuth();
+  const [name, setName] = useState(profile?.name || '');
+  const [companyName, setCompanyName] = useState(profile?.company_name || '');
+  const [email, setEmail] = useState(user?.email || '');
+  const [isSaving, setIsSaving] = useState(false);
 
-type ProfileFormValues = z.infer<typeof profileFormSchema>;
+  useEffect(() => {
+    if (!user) {
+      navigate('/login');
+    }
+  }, [user, navigate]);
 
-const Profile = () => {
-  const { user, profile, isSuper } = useAuth();
-  const [loading, setLoading] = useState(false);
-  
-  const form = useForm<ProfileFormValues>({
-    resolver: zodResolver(profileFormSchema),
-    defaultValues: {
-      name: profile?.name || "",
-      company_name: profile?.company_name || "",
-      ibc_registration_number: profile?.ibc_registration_number || "",
-      communications_address: profile?.communications_address || "",
-    },
-  });
-
-  // Update form values when profile changes
   useEffect(() => {
     if (profile) {
-      form.setValue("name", profile.name);
-      form.setValue("company_name", profile.company_name || "");
-      form.setValue("ibc_registration_number", profile.ibc_registration_number || "");
-      form.setValue("communications_address", profile.communications_address || "");
+      setName(profile.name || '');
+      setCompanyName(profile.company_name || '');
     }
-  }, [profile, form]);
+    if (user) {
+      setEmail(user.email || '');
+    }
+  }, [profile, user]);
 
-  const onSubmit = async (values: ProfileFormValues) => {
-    if (!user) return;
-    
+  const handleUpdateProfile = async () => {
+    setIsSaving(true);
     try {
-      setLoading(true);
-      
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          name: values.name,
-          company_name: values.company_name || null,
-          ibc_registration_number: values.ibc_registration_number || null,
-          communications_address: values.communications_address || null,
-        })
-        .eq('id', user.id);
-        
-      if (error) throw error;
-      
-      toast.success("Profile updated successfully");
+      await updateProfile({ name, company_name: companyName });
+      toast.success('Profile updated successfully!');
     } catch (error: any) {
-      console.error("Error updating profile:", error.message);
-      toast.error(error.message || "Failed to update profile");
+      console.error('Profile update error:', error);
+      toast.error(error.message || 'Failed to update profile');
     } finally {
-      setLoading(false);
+      setIsSaving(false);
     }
   };
-  
-  if (!user || !profile) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-evoting-600"></div>
-      </div>
-    );
+
+  if (!user) {
+    return <div>Loading...</div>;
   }
 
   return (
-    <div>
-      <Navigation />
-      
-      <div className="container mx-auto px-4 py-8 max-w-3xl">
-        <h1 className="text-3xl font-bold mb-8">Your Profile</h1>
-        
-        <div className="grid grid-cols-1 gap-8">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <User size={20} />
-                Account Information
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="text-sm text-gray-500">Email</label>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Mail size={16} className="text-gray-500" />
-                    <span>{user.email}</span>
-                  </div>
-                </div>
-                <div>
-                  <label className="text-sm text-gray-500">Role</label>
-                  <div className="mt-1">
-                    <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-medium capitalize">
-                      {profile.role.replace('_', ' ')}
-                    </span>
-                  </div>
-                </div>
-                <div>
-                  <label className="text-sm text-gray-500">Member Since</label>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Calendar size={16} className="text-gray-500" />
-                    <span>
-                      {new Date(profile.created_at).toLocaleDateString()}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <User size={20} />
-                Edit Profile
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                  <FormField
-                    control={form.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Full Name</FormLabel>
-                        <FormControl>
-                          <Input {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="company_name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Company Name (Optional)</FormLabel>
-                        <FormControl>
-                          <Input {...field} value={field.value || ""} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="ibc_registration_number"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>IBC Registration Number</FormLabel>
-                        <FormControl>
-                          <Input {...field} value={field.value || ""} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="communications_address"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Communications Address</FormLabel>
-                        <FormControl>
-                          <Textarea 
-                            {...field} 
-                            value={field.value || ""} 
-                            rows={4}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <Button 
-                    type="submit" 
-                    className="bg-evoting-600 hover:bg-evoting-700 text-white"
-                    disabled={loading}
-                  >
-                    {loading ? "Updating..." : "Save Changes"}
-                  </Button>
-                </form>
-              </Form>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+    <div className="flex flex-col min-h-screen">
+      <Header />
+      <main className="container mx-auto px-4 py-8 flex-grow">
+        <Button asChild variant="outline" className="mb-6">
+          <Link to="/projects" className="flex items-center">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Projects
+          </Link>
+        </Button>
+        <Card className="w-full max-w-md mx-auto">
+          <CardHeader className="flex flex-col items-center space-y-2">
+            <Avatar className="h-20 w-20">
+              <AvatarImage src={`https://api.dicebear.com/7.x/pixel-art/svg?seed=${user.id}`} alt={name} />
+              <AvatarFallback>{name?.charAt(0).toUpperCase() || 'U'}</AvatarFallback>
+            </Avatar>
+            <CardTitle className="text-2xl font-bold">{name || 'User Profile'}</CardTitle>
+            <CardDescription>Manage your profile information</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-2">
+              <label htmlFor="email" className="text-right text-sm font-medium leading-none peer-disabled:cursor-not-allowed">
+                Email
+              </label>
+              <input
+                type="email"
+                id="email"
+                value={email}
+                readOnly
+                className="flex h-10 w-full rounded-md border border-gray-300 bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-gray-950 disabled:cursor-not-allowed disabled:opacity-50"
+              />
+            </div>
+            <div className="grid gap-2">
+              <label htmlFor="name" className="text-right text-sm font-medium leading-none peer-disabled:cursor-not-allowed">
+                Full Name
+              </label>
+              <input
+                type="text"
+                id="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="flex h-10 w-full rounded-md border border-gray-300 bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-gray-950 disabled:cursor-not-allowed disabled:opacity-50"
+                placeholder="Enter your full name"
+              />
+            </div>
+            <div className="grid gap-2">
+              <label htmlFor="companyName" className="text-right text-sm font-medium leading-none peer-disabled:cursor-not-allowed">
+                Company Name
+              </label>
+              <input
+                type="text"
+                id="companyName"
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                className="flex h-10 w-full rounded-md border border-gray-300 bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-gray-950 disabled:cursor-not-allowed disabled:opacity-50"
+                placeholder="Enter your company name"
+              />
+            </div>
+            <Button className="w-full" onClick={handleUpdateProfile} disabled={isSaving}>
+              {isSaving ? 'Saving...' : 'Update Profile'}
+            </Button>
+          </CardContent>
+        </Card>
+      </main>
+      <Footer />
     </div>
   );
 };
 
-export default Profile;
+export default ProfilePage;
