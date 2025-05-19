@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -11,10 +12,8 @@ import {
 } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { HelpCircle, Mail, RefreshCw, Send } from "lucide-react";
+import { HelpCircle, Mail, RefreshCw, Send, Vote as VoteIcon } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
-import Header from "@/components/layout/Header";
-import Footer from "@/components/layout/Footer";
 
 const VoterLogin = () => {
   const navigate = useNavigate();
@@ -67,7 +66,7 @@ const VoterLogin = () => {
       return;
     }
     
-    // Show OTP input field immediately - this is the key change
+    // Show OTP input field immediately
     setShowOtpInput(true);
     
     // Start sending OTP process
@@ -77,8 +76,6 @@ const VoterLogin = () => {
     try {
       // Generate a 6-digit OTP
       const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-      
-      // Store OTP in state for testing and later validation
       setGeneratedOtp(generatedOtp);
       console.log("🔑 TESTING OTP:", generatedOtp);
       
@@ -113,7 +110,7 @@ const VoterLogin = () => {
         }
       }
       
-      // Attempt to store the OTP in the database - handle errors gracefully
+      // Store OTP in the database - handle errors gracefully
       try {
         // Store OTP in the database with expiration time (15 mins)
         const expiresAt = new Date();
@@ -130,18 +127,27 @@ const VoterLogin = () => {
             v_expires_at: expiresAt.toISOString()
           });
         } else {
-          // For non-existent voters, we'll just store the OTP in memory
-          // and validate it locally (no database storage)
-          console.log("No existing voter found, will validate OTP locally");
+          // For non-existent voters, directly insert into voter_otps table without voter_id
+          const { error: insertError } = await supabase
+            .from('voter_otps')
+            .insert({
+              email: email,
+              otp: generatedOtp,
+              expires_at: expiresAt.toISOString(),
+              used: false
+            });
+          
+          if (insertError) {
+            console.error("Error storing OTP in database:", insertError);
+          }
         }
       } catch (dbError: any) {
         // Log the error but continue - we still have the OTP in memory
         console.error("Error storing OTP in database:", dbError);
-        console.log("Will use in-memory OTP validation instead");
       }
       
       // Prepare the voting link - this will be used in the email
-      const votingLink = `${window.location.origin}/projects/${projectId || 'login'}/voter-login`;
+      const votingLink = `${window.location.origin}/projects/${projectId || 'all'}/voter-login`;
       
       // Send OTP via email using our edge function
       try {
@@ -184,33 +190,30 @@ const VoterLogin = () => {
     try {
       setLoading(true);
       
-      // First check if the OTP matches our generated OTP (memory validation)
-      if (otp === generatedOtp) {
-        console.log("OTP validated locally");
-      } else {
-        // If not matching locally, try database validation
-        console.log("Local OTP doesn't match, trying database validation");
-        
-        // Check if there's a valid OTP record for this email in the database
-        const { data: otpData, error: otpQueryError } = await supabase
-          .from('voter_otps')
-          .select('*')
-          .eq('email', email)
-          .eq('otp', otp)
-          .eq('used', false)
-          .gt('expires_at', new Date().toISOString())
-          .single();
-        
-        if (otpQueryError || !otpData) {
-          throw new Error('Invalid or expired OTP. Please request a new one.');
-        }
-        
-        // Mark the OTP as used if it was found in the database
-        await supabase
-          .from('voter_otps')
-          .update({ used: true })
-          .eq('id', otpData.id);
+      // Verify OTP using the database
+      const { data: otpData, error: otpQueryError } = await supabase
+        .from('voter_otps')
+        .select('*')
+        .eq('email', email)
+        .eq('otp', otp)
+        .eq('used', false)
+        .gt('expires_at', new Date().toISOString())
+        .maybeSingle();
+      
+      if (otpQueryError) {
+        console.error("OTP verification error:", otpQueryError);
+        throw new Error('Failed to verify OTP. Please try again.');
       }
+      
+      if (!otpData) {
+        throw new Error('Invalid or expired OTP. Please request a new one.');
+      }
+      
+      // Mark the OTP as used
+      await supabase
+        .from('voter_otps')
+        .update({ used: true })
+        .eq('id', otpData.id);
       
       // Check if voter exists with the given email
       const { data: voterData, error: voterError } = await supabase
@@ -262,14 +265,19 @@ const VoterLogin = () => {
       setLoading(false);
     }
   };
-  
-  const handleGoBack = () => {
-    navigate('/');
-  };
 
   return (
     <div className="flex flex-col min-h-screen">
-      <Header />
+      <header className="w-full bg-white/90 backdrop-blur-sm border-b border-gray-200 py-4">
+        <div className="container mx-auto px-4 flex items-center justify-center">
+          <div className="flex items-center gap-2">
+            <VoteIcon className="text-evoting-600 h-6 w-6" />
+            <span className="text-2xl font-bold bg-clip-text text-evoting-800">
+              The-Evoting
+            </span>
+          </div>
+        </div>
+      </header>
       
       <div className="flex-grow flex items-center justify-center p-4"
            style={{
@@ -374,19 +382,16 @@ const VoterLogin = () => {
                 <HelpCircle className="inline-block mr-1 h-4 w-4" />
                 Having trouble logging in? Contact your meeting administrator
               </p>
-              <Button
-                variant="ghost"
-                className="mt-2 text-evoting-600"
-                onClick={handleGoBack}
-              >
-                Back to Home
-              </Button>
             </div>
           </CardContent>
         </Card>
       </div>
       
-      <Footer />
+      <footer className="bg-gray-50 py-6 text-center text-sm text-gray-500">
+        <div className="container mx-auto px-4">
+          <p>&copy; {new Date().getFullYear()} The-eVoting. All rights reserved.</p>
+        </div>
+      </footer>
     </div>
   );
 };

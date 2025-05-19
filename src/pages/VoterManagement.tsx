@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -143,7 +142,29 @@ const VoterManagement = () => {
         return;
       }
 
-      // Insert the new voter
+      // If company name is provided, check if any voter from the same company exists
+      // and use their voting weight (do not reduce it)
+      let votingWeightToUse = newVoterWeight;
+      
+      if (newVoterCompany) {
+        const { data: sameCompanyVoters, error: companyError } = await supabase
+          .from('voters')
+          .select('voting_weight')
+          .eq('project_id', projectId)
+          .eq('company_name', newVoterCompany)
+          .order('voting_weight', { ascending: false })
+          .limit(1);
+          
+        if (companyError) throw companyError;
+        
+        // If voters from same company exist, use their voting weight if it's higher
+        if (sameCompanyVoters && sameCompanyVoters.length > 0) {
+          // Keep the user-entered weight or use existing company weight, whichever is higher
+          votingWeightToUse = Math.max(newVoterWeight, sameCompanyVoters[0].voting_weight);
+        }
+      }
+
+      // Insert the new voter with potentially adjusted voting weight
       const { data, error } = await supabase
         .from('voters')
         .insert([
@@ -152,7 +173,7 @@ const VoterManagement = () => {
             name: newVoterName,
             email: newVoterEmail.toLowerCase(),
             company_name: newVoterCompany || null,
-            voting_weight: newVoterWeight
+            voting_weight: votingWeightToUse
           },
         ])
         .select();
