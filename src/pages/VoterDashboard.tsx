@@ -14,11 +14,12 @@ interface VoterSession {
   loggedInAt: string;
 }
 
-// Updated Project interface - make name optional since it might be an error object
+// Define a more flexible project type to handle potential errors
 interface Project {
   name?: string;
 }
 
+// Adjust Agenda interface to handle possible error responses from Supabase
 interface Agenda {
   id: string;
   title: string;
@@ -26,7 +27,7 @@ interface Agenda {
   start_date: string;
   end_date: string;
   project_id: string;
-  projects?: Project | null;
+  projects?: Project | null | any; // Make this more flexible to handle error objects
   project_name?: string;
 }
 
@@ -98,26 +99,37 @@ const VoterDashboard = () => {
       // Handle the case where agendas might be null or not an array
       const validAgendas = Array.isArray(agendasData) ? agendasData : [];
       
-      // Safely map and filter the agendas
-      const filteredAgendas: Agenda[] = validAgendas
+      // Process each agenda to extract project name safely
+      const processedAgendas: Agenda[] = validAgendas
         .filter(agenda => projectIds.includes(agenda.project_id))
         .map(agenda => {
-          // Check if projects exists and if it has a name property that's a string
-          const projectName = agenda.projects && 
-                             typeof agenda.projects === 'object' && 
-                             agenda.projects !== null && 
-                             'name' in agenda.projects && 
-                             typeof agenda.projects.name === 'string' 
-                               ? agenda.projects.name 
-                               : 'Unknown Project';
-                               
+          // Extract project name safely with multiple null checks
+          let projectName = 'Unknown Project';
+          
+          try {
+            if (agenda.projects && 
+                typeof agenda.projects === 'object' && 
+                agenda.projects !== null) {
+              // Either it's a valid project object with a name or an error object
+              if ('name' in agenda.projects && typeof agenda.projects.name === 'string') {
+                projectName = agenda.projects.name;
+              }
+            }
+          } catch (e) {
+            console.error("Error extracting project name:", e);
+          }
+          
+          // Create a new agenda object with the extracted project name
+          // and without the problematic projects property
+          const { projects, ...agendaWithoutProjects } = agenda;
+          
           return {
-            ...agenda,
+            ...agendaWithoutProjects,
             project_name: projectName
-          };
+          } as Agenda;
         });
       
-      setAgendaItems(filteredAgendas);
+      setAgendaItems(processedAgendas);
       
     } catch (error: any) {
       console.error("Error fetching agenda items:", error);
