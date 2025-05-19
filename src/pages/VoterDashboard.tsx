@@ -107,12 +107,12 @@ const VoterDashboard = () => {
           let projectName = 'Unknown Project';
           
           try {
-            if (agenda.projects && 
-                typeof agenda.projects === 'object' && 
-                agenda.projects !== null) {
-              // Either it's a valid project object with a name or an error object
-              if ('name' in agenda.projects && typeof agenda.projects.name === 'string') {
-                projectName = agenda.projects.name;
+            // First check if projects exists and is an object
+            const projectsData = agenda.projects;
+            if (projectsData && typeof projectsData === 'object') {
+              // If it has a name property that's a string, use it
+              if ('name' in projectsData && typeof projectsData.name === 'string') {
+                projectName = projectsData.name;
               }
             }
           } catch (e) {

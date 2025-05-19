@@ -9,6 +9,7 @@ import { Vote as VoteIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import Footer from "@/components/layout/Footer";
 import { sendVoterOTP } from "@/lib/emailUtils";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 
 const VoterLogin = () => {
   const navigate = useNavigate();
@@ -52,7 +53,7 @@ const VoterLogin = () => {
       // In a real application, you would send this OTP via email
       const { success, message } = await sendVoterOTP(
         email,
-        voter.name,
+        voter.name || 'Voter', // Provide a fallback if name is null
         randomOtp,
         "The-eVoting",
         window.location.origin
@@ -157,15 +158,21 @@ const VoterLogin = () => {
             <form onSubmit={handleVerifyOtp} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="otp">Enter OTP</Label>
-                <Input 
-                  id="otp"
-                  type="text"
-                  placeholder="Enter the 6-digit code"
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value)}
-                  required
-                  maxLength={6}
-                />
+                <div className="flex flex-col items-center gap-4">
+                  <InputOTP 
+                    value={otp}
+                    onChange={(value) => setOtp(value)}
+                    maxLength={6}
+                    render={({ slots }) => (
+                      <InputOTPGroup>
+                        {slots.map((slot, index) => (
+                          <InputOTPSlot key={index} {...slot} index={index} />
+                        ))}
+                      </InputOTPGroup>
+                    )}
+                  />
+                  <p className="text-xs text-gray-500">A 6-digit code has been sent to your email</p>
+                </div>
               </div>
               
               <Button 
