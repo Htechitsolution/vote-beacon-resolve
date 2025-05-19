@@ -14,12 +14,11 @@ interface VoterSession {
   loggedInAt: string;
 }
 
-// Define a more flexible project type to handle potential errors
 interface Project {
+  id?: string;
   name?: string;
 }
 
-// Adjust Agenda interface to handle possible error responses from Supabase
 interface Agenda {
   id: string;
   title: string;
@@ -63,7 +62,7 @@ const VoterDashboard = () => {
     try {
       setIsLoading(true);
       
-      // First get all agendas with project name
+      // First get all agendas
       const { data: agendasData, error: agendasError } = await supabase
         .from('agendas')
         .select(`
@@ -72,10 +71,7 @@ const VoterDashboard = () => {
           description,
           start_date,
           end_date,
-          project_id,
-          projects (
-            name
-          )
+          project_id
         `);
       
       if (agendasError) {
@@ -95,38 +91,42 @@ const VoterDashboard = () => {
       // Filter agendas to only include those where this voter's project matches
       const projectIds = voterRecords.map(voter => voter.project_id);
       
+      // Get project names in a separate query
+      const { data: projectsData, error: projectsError } = await supabase
+        .from('projects')
+        .select('id, title as name')
+        .in('id', projectIds);
+
+      if (projectsError) {
+        console.error("Error fetching projects:", projectsError);
+      }
+      
+      // Create a map of project IDs to project names for easy lookup
+      const projectNameMap: Record<string, string> = {};
+      if (projectsData) {
+        projectsData.forEach(project => {
+          if (project && project.id) {
+            projectNameMap[project.id] = project.name || 'Unknown Project';
+          }
+        });
+      }
+      
       // Handle the case where agendas might be null or not an array
       const validAgendas = Array.isArray(agendasData) ? agendasData : [];
       
-      // Process each agenda to extract project name safely
+      // Process each agenda to include project name
       const processedAgendas: Agenda[] = validAgendas
         .filter(agenda => projectIds.includes(agenda.project_id))
         .map(agenda => {
-          // Extract project name safely with multiple null checks
-          let projectName = 'Unknown Project';
-          
-          try {
-            // Use optional chaining for all property accesses
-            const projectsData = agenda.projects;
-            // Fix the conditional to handle null/undefined properly
-            if (projectsData) {
-              // Use optional chaining and nullish coalescing for safe access
-              projectName = typeof projectsData.name === 'string' ? projectsData.name : 'Unknown Project';
-            }
-          } catch (e) {
-            console.error("Error extracting project name:", e);
-          }
-          
-          // Return a clean agenda object without the problematic 'projects' property
           return {
             id: agenda.id,
             title: agenda.title,
-            description: agenda.description,
+            description: agenda.description || '',
             start_date: agenda.start_date,
             end_date: agenda.end_date,
             project_id: agenda.project_id,
-            project_name: projectName
-          } as Agenda;
+            project_name: projectNameMap[agenda.project_id] || 'Unknown Project'
+          };
         });
       
       setAgendaItems(processedAgendas);
