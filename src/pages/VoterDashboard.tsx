@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -14,6 +13,10 @@ interface VoterSession {
   loggedInAt: string;
 }
 
+interface Project {
+  name: string;
+}
+
 interface Agenda {
   id: string;
   title: string;
@@ -21,7 +24,8 @@ interface Agenda {
   start_date: string;
   end_date: string;
   project_id: string;
-  project_name: string;
+  projects: Project | null;
+  project_name?: string;
 }
 
 const VoterDashboard = () => {
@@ -88,11 +92,15 @@ const VoterDashboard = () => {
       
       // Filter agendas to only include those where this voter's project matches
       const projectIds = voterRecords.map(voter => voter.project_id);
-      const filteredAgendas = agendas
+      
+      // Handle the case where agendas might be null or not an array
+      const validAgendas = Array.isArray(agendas) ? agendas : [];
+      
+      const filteredAgendas = validAgendas
         .filter(agenda => projectIds.includes(agenda.project_id))
         .map(agenda => ({
           ...agenda,
-          project_name: agenda.projects ? agenda.projects.name : 'Unknown Project'
+          project_name: agenda.projects && 'name' in agenda.projects ? agenda.projects.name : 'Unknown Project'
         }));
       
       setAgendaItems(filteredAgendas);
