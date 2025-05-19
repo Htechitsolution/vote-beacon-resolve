@@ -75,19 +75,19 @@ const VoterDashboard = () => {
       }
       
       // Then get all voters linked to agendas where this voter's email matches
-      const { data: voterAgendas, error: voterAgendasError } = await supabase
+      const { data: voterRecords, error: voterError } = await supabase
         .from('voters')
-        .select('agenda_id')
+        .select('id, project_id')
         .eq('email', voterEmail);
       
-      if (voterAgendasError) {
-        throw voterAgendasError;
+      if (voterError) {
+        throw voterError;
       }
       
-      // Filter agendas to only include those where this voter is included
-      const agendaIds = voterAgendas.map(va => va.agenda_id);
+      // Filter agendas to only include those where this voter's project matches
+      const projectIds = voterRecords.map(voter => voter.project_id);
       const filteredAgendas = agendas
-        .filter(agenda => agendaIds.includes(agenda.id))
+        .filter(agenda => projectIds.includes(agenda.project_id))
         .map(agenda => ({
           ...agenda,
           project_name: agenda.projects?.name || 'Unknown Project'
