@@ -1,6 +1,6 @@
 
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,13 +33,19 @@ const VoterLogin = () => {
       setIsGeneratingOtp(true);
       
       // Check if voter exists
-      const { data: voter, error: voterError } = await supabase
+      const { data: voterData, error: voterError } = await supabase
         .from('voters')
         .select('id, name')
         .eq('email', email)
-        .single();
+        .maybeSingle();
       
-      if (voterError || !voter) {
+      if (voterError) {
+        console.error("Error fetching voter:", voterError);
+        toast.error("Error checking voter: " + voterError.message);
+        return;
+      }
+      
+      if (!voterData) {
         toast.error("No voter account found with this email");
         return;
       }
@@ -47,13 +53,13 @@ const VoterLogin = () => {
       // Generate a random 6-digit OTP
       const randomOtp = Math.floor(100000 + Math.random() * 900000).toString();
       setGeneratedOtp(randomOtp);
-      setVoterId(voter.id);
-      console.log("Generated OTP:", randomOtp); // For testing purposes
+      setVoterId(voterData.id);
+      console.log("Generated OTP for debugging:", randomOtp); // Ensure OTP is logged to console
       
       // In a real application, you would send this OTP via email
       const { success, message } = await sendVoterOTP(
         email,
-        voter.name || 'Voter', // Provide a fallback if name is null
+        voterData.name || 'Voter', // Provide a fallback if name is null
         randomOtp,
         "The-eVoting",
         window.location.origin
@@ -116,12 +122,12 @@ const VoterLogin = () => {
       {/* Header for Voter Login */}
       <header className="sticky top-0 w-full bg-white/90 backdrop-blur-sm border-b border-gray-200 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <Link to="/" className="flex items-center gap-2">
             <VoteIcon className="text-evoting-600 h-19 w-19" />
             <span className="text-2xl font-bold bg-clip-text text-evoting-800">
               The-Evoting
             </span>
-          </div>
+          </Link>
         </div>
       </header>
       
@@ -153,6 +159,19 @@ const VoterLogin = () => {
               >
                 {isGeneratingOtp ? "Generating OTP..." : "Generate OTP"}
               </Button>
+              
+              <div className="text-center mt-4">
+                <p className="text-gray-600">
+                  Are you an admin?{" "}
+                  <Link to="/login" className="text-evoting-600 hover:underline">
+                    Login here
+                  </Link>
+                </p>
+                
+                <Link to="/" className="text-sm text-evoting-600 hover:underline block mt-2">
+                  Return to home page
+                </Link>
+              </div>
             </form>
           ) : (
             <form onSubmit={handleVerifyOtp} className="space-y-4">
