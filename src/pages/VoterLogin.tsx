@@ -174,7 +174,7 @@ const VoterLogin = () => {
         toast.warning("Email might not be sent, but check console for OTP");
       }
       
-      // Show the OTP input field regardless of email sending success
+      // Always show the OTP input field after sending OTP
       setShowOtpInput(true);
       
     } catch (error: any) {
@@ -214,17 +214,18 @@ const VoterLogin = () => {
         voting_weight: 1
       };
       
-      // Verify OTP against the email (rather than a specific voter ID)
-      const { data: otpData, error: otpError } = await supabase.rpc('verify_voter_otp_by_email', {
-        v_email: email,
-        v_otp: otp
-      });
+      // Verify OTP against the email
+      const { data: otpIsValid, error: otpError } = await supabase
+        .rpc('verify_voter_otp_by_email', {
+          v_email: email,
+          v_otp: otp
+        });
         
       if (otpError) {
         throw new Error('Invalid or expired OTP. Please request a new one.');
       }
       
-      if (!otpData) {
+      if (!otpIsValid) {
         throw new Error('Invalid or expired OTP. Please request a new one.');
       }
       
@@ -276,7 +277,7 @@ const VoterLogin = () => {
            }}>
         <div className="absolute inset-0 bg-black bg-opacity-50 backdrop-blur-sm"></div>
         
-        <Card className="w-full max-w-md shadow-xl border-0 relative">
+        <Card className="w-full max-w-md shadow-xl border-0 relative z-10">
           <CardHeader className="space-y-1 pb-4 text-center">
             <CardTitle className="text-2xl font-bold text-evoting-800">Voter Login</CardTitle>
             <CardDescription>
