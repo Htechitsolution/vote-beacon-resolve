@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -91,10 +90,10 @@ const VoterDashboard = () => {
       // Filter agendas to only include those where this voter's project matches
       const projectIds = voterRecords.map(voter => voter.project_id);
       
-      // Get project names in a separate query
+      // Get project names in a separate query - Fix the syntax error here
       const { data: projectsData, error: projectsError } = await supabase
         .from('projects')
-        .select('id, title as name')
+        .select('id, title')
         .in('id', projectIds);
 
       if (projectsError) {
@@ -106,7 +105,7 @@ const VoterDashboard = () => {
       if (projectsData) {
         projectsData.forEach(project => {
           if (project && project.id) {
-            projectNameMap[project.id] = project.name || 'Unknown Project';
+            projectNameMap[project.id] = project.title || 'Unknown Project';
           }
         });
       }
