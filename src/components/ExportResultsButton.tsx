@@ -1,7 +1,8 @@
+
 import React from 'react';
 import { Button } from "@/components/ui/button";
 import { CSVLink } from 'react-csv';
-import { FileDown, FileTypeCsv } from 'lucide-react';
+import { FileDown, FileType } from 'lucide-react';
 import { useToast } from "@/components/ui/use-toast"
 import {
   AlertDialog,
