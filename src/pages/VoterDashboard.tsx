@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -5,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from 'sonner';
 import { Vote, LogOut, Home } from 'lucide-react';
 import {
   Table,
@@ -31,32 +32,29 @@ const VoterDashboard = () => {
   const { user, profile } = useAuth();
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [loading, setLoading] = useState(true);
+  const [voterEmail, setVoterEmail] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!user) {
+    // Check if there's voter information in session storage
+    const voterData = sessionStorage.getItem('voter');
+    if (voterData) {
+      const voter = JSON.parse(voterData);
+      setVoterEmail(voter.email);
+      fetchMeetings(voter.email);
+    } else if (user) {
+      // Fallback to authenticated user if available
+      setVoterEmail(user.email);
+      fetchMeetings(user.email);
+    } else {
       navigate('/voter-login');
-      return;
     }
-
-    fetchMeetings();
   }, [user]);
 
-  const fetchMeetings = async () => {
+  const fetchMeetings = async (email: string) => {
     try {
       setLoading(true);
-      if (!user) return;
-
-      // Get voter's email
-      const email = user.email;
-      
-      if (!email) {
-        toast("Error", {
-          description: "Unable to find voter information",
-          variant: "destructive"
-        });
-        return;
-      }
+      if (!email) return;
 
       // Find projects where this voter is registered
       const { data: voterData, error: voterError } = await supabase
@@ -67,6 +65,7 @@ const VoterDashboard = () => {
       if (voterError) throw voterError;
       
       if (!voterData || voterData.length === 0) {
+        console.log("No projects found for voter with email:", email);
         setLoading(false);
         return;
       }
@@ -95,10 +94,7 @@ const VoterDashboard = () => {
       setMeetings(formattedMeetings);
     } catch (error: any) {
       console.error('Error fetching meetings:', error.message);
-      toast("Error", {
-        description: "Failed to load your meetings",
-        variant: "destructive"
-      });
+      toast.error("Failed to load your meetings");
     } finally {
       setLoading(false);
     }
@@ -106,17 +102,19 @@ const VoterDashboard = () => {
 
   const handleLogout = async () => {
     try {
-      await supabase.auth.signOut();
+      // Clear voter session storage
+      sessionStorage.removeItem('voter');
+      
+      // Also sign out from Supabase auth if user is logged in
+      if (user) {
+        await supabase.auth.signOut();
+      }
+      
       navigate('/voter-login');
-      toast("Success", {
-        description: "Logged out successfully"
-      });
+      toast.success("Logged out successfully");
     } catch (error: any) {
       console.error('Logout error:', error.message);
-      toast("Error", {
-        description: "Failed to log out",
-        variant: "destructive"
-      });
+      toast.error("Failed to log out");
     }
   };
 
@@ -140,7 +138,7 @@ const VoterDashboard = () => {
             <span className="text-xl font-bold text-evoting-800">The-Evoting</span>
           </Link>
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600 mr-2 hidden md:inline">{user?.email}</span>
+            <span className="text-sm text-gray-600 mr-2 hidden md:inline">{voterEmail}</span>
             <div className="flex space-x-2">
               <Button 
                 variant="ghost"
@@ -185,7 +183,7 @@ const VoterDashboard = () => {
               />
               <h3 className="text-xl font-medium text-gray-600 mb-2">No meetings found</h3>
               <p className="text-gray-500 mb-6 max-w-md mx-auto">
-                You haven't been invited to any meetings yet. Once an admin adds you to a meeting, it will appear here.
+                You haven't been invited to any meetings yet. Please check back later or contact the meeting administrator if you believe this is an error.
               </p>
               <Button 
                 variant="outline"

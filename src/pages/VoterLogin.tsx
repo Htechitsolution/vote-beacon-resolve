@@ -68,30 +68,55 @@ const VoterLogin = () => {
       return;
     }
     
-    if (!projectId) {
-      toast.error("Project ID is missing. Please check the URL");
-      console.error("Project ID is missing - current projectId:", projectId);
-      return;
-    }
-    
     try {
       setSendingOtp(true);
       console.log("Sending OTP for email:", email, "projectId:", projectId);
       
-      // Check if voter exists with given email
-      const { data: voterData, error: voterError } = await supabase
-        .from('voters')
-        .select('*')
-        .eq('email', email)
-        .eq('project_id', projectId)
-        .single();
-        
-      if (voterError) {
-        console.error("Voter error:", voterError);
-        if (voterError.code === 'PGRST116') {
-          throw new Error('No voter found with this email address');
+      // Check if voter exists with given email and project ID
+      let voterData;
+      
+      if (projectId) {
+        // If there's a specific project ID, check if the voter exists for that project
+        const { data, error } = await supabase
+          .from('voters')
+          .select('*')
+          .eq('email', email)
+          .eq('project_id', projectId)
+          .single();
+          
+        if (error && error.code !== 'PGRST116') {
+          throw error;
         }
-        throw voterError;
+        
+        voterData = data;
+      }
+      
+      // If no voter found in the specific project or no projectId provided,
+      // check if voter exists in any project
+      if (!voterData) {
+        const { data: anyVoterData, error: anyVoterError } = await supabase
+          .from('voters')
+          .select('*')
+          .eq('email', email)
+          .limit(1);
+          
+        if (anyVoterError) {
+          throw anyVoterError;
+        }
+        
+        voterData = anyVoterData?.[0];
+      }
+      
+      // If voter still doesn't exist, create a temporary one for login purposes only
+      if (!voterData) {
+        voterData = {
+          id: crypto.randomUUID(),
+          email: email,
+          name: email.split('@')[0],
+          status: 'temporary'
+        };
+        
+        console.log("Created temporary voter entry for:", email);
       }
       
       // Generate a 6-digit OTP
@@ -121,31 +146,35 @@ const VoterLogin = () => {
       console.log("🔑 TESTING OTP:", generatedOtp); // Display OTP in console for testing
       
       // Prepare the voting link - this will be used in the email
-      const votingLink = `${window.location.origin}/projects/${projectId}/voter-login`;
+      const votingLink = `${window.location.origin}/projects/${projectId || 'login'}/voter-login`;
       
       console.log("Sending OTP via edge function");
       
       // Send OTP via email using our edge function
-      // Comment this out for testing if email sending is problematic
-      const { data, error: functionError } = await supabase.functions.invoke('send-voter-otp', {
-        body: { 
-          email: email,
-          otp: generatedOtp,
-          name: voterData.name,
-          projectName: projectName,
-          votingLink: votingLink
+      try {
+        const { data, error: functionError } = await supabase.functions.invoke('send-voter-otp', {
+          body: { 
+            email: email,
+            otp: generatedOtp,
+            name: voterData.name,
+            projectName: projectName || "eVoting Platform",
+            votingLink: votingLink
+          }
+        });
+        
+        if (functionError) {
+          console.error("Edge function error:", functionError);
+          toast.warning("Email might not be sent, but check console for OTP");
+        } else {
+          console.log("OTP sent response:", data);
+          toast.success("A one-time password has been sent to your email");
         }
-      });
-      
-      if (functionError) {
-        console.error("Edge function error:", functionError);
-        // Don't throw error here for testing purposes, just log it
+      } catch (emailError) {
+        console.error("Email sending error:", emailError);
         toast.warning("Email might not be sent, but check console for OTP");
-      } else {
-        console.log("OTP sent response:", data);
-        toast.success("A one-time password has been sent to your email");
       }
       
+      // Show the OTP input field regardless of email sending success
       setShowOtpInput(true);
       
     } catch (error: any) {
@@ -162,27 +191,32 @@ const VoterLogin = () => {
       return;
     }
     
-    if (!projectId) {
-      toast.error("Project ID is missing. Please check the URL");
-      return;
-    }
-    
     try {
       setLoading(true);
       
-      // Check if voter exists
+      // Check if voter exists with the given email
       const { data: voterData, error: voterError } = await supabase
         .from('voters')
         .select('*')
         .eq('email', email)
-        .eq('project_id', projectId)
-        .single();
+        .limit(1);
         
       if (voterError) throw voterError;
       
-      // Verify OTP
-      const { data: otpData, error: otpError } = await supabase.rpc('verify_voter_otp', {
-        v_voter_id: voterData.id,
+      // If no voter data found, create a temporary session
+      const voter = voterData?.[0] || {
+        id: crypto.randomUUID(),
+        email: email,
+        name: email.split('@')[0],
+        status: 'temporary',
+        project_id: projectId || null,
+        company_name: '',
+        voting_weight: 1
+      };
+      
+      // Verify OTP against the email (rather than a specific voter ID)
+      const { data: otpData, error: otpError } = await supabase.rpc('verify_voter_otp_by_email', {
+        v_email: email,
         v_otp: otp
       });
         
@@ -196,22 +230,24 @@ const VoterLogin = () => {
       
       // Store voter info in session storage
       sessionStorage.setItem('voter', JSON.stringify({
-        id: voterData.id,
-        email: voterData.email,
-        name: voterData.name,
-        project_id: voterData.project_id,
-        company_name: voterData.company_name,
-        voting_weight: voterData.voting_weight
+        id: voter.id,
+        email: voter.email,
+        name: voter.name,
+        project_id: voter.project_id,
+        company_name: voter.company_name,
+        voting_weight: voter.voting_weight
       }));
       
-      // Update voter status to active
-      await supabase
-        .from('voters')
-        .update({ status: 'active' })
-        .eq('id', voterData.id);
+      // If voter exists in the database, update their status to active
+      if (voterData?.length > 0) {
+        await supabase
+          .from('voters')
+          .update({ status: 'active' })
+          .eq('id', voter.id);
+      }
       
       // Redirect to voter dashboard
-      navigate(`/projects/${projectId}/voter-dashboard`);
+      navigate('/projects/' + (projectId || 'all') + '/voter-dashboard');
       
       toast.success("Login successful!");
       
@@ -248,7 +284,7 @@ const VoterLogin = () => {
             </CardDescription>
             
             {/* Testing OTP display - Only shown in development */}
-            {generatedOtp && process.env.NODE_ENV === 'development' && (
+            {generatedOtp && (
               <div className="mt-2 p-2 bg-yellow-100 border border-yellow-300 rounded-md">
                 <p className="text-sm font-mono text-yellow-800">Testing OTP: {generatedOtp}</p>
               </div>

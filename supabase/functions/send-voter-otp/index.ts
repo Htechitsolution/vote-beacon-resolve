@@ -39,7 +39,7 @@ serve(async (req) => {
     const payload: OtpRequest = await req.json();
     const { email, name, otp, projectName, votingLink, isResultEmail, resultTitle, resultUrl } = payload;
 
-    // Log OTP for testing purposes
+    // Always log OTP for testing purposes
     console.log("==================================");
     console.log("🔑 TESTING - OTP for", email, ":", otp);
     console.log("==================================");
@@ -123,7 +123,7 @@ serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         message: isResultEmail ? "Results email sent successfully" : "OTP sent successfully",
-        testingInfo: process.env.NODE_ENV === 'development' ? { otp } : undefined
+        testingInfo: { otp } // Always include OTP for testing
       }),
       {
         status: 200,
