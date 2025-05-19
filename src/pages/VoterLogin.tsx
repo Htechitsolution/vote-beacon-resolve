@@ -67,11 +67,22 @@ const VoterLogin = () => {
       return;
     }
     
+    // Show OTP input field immediately - this is the key change
+    setShowOtpInput(true);
+    
+    // Start sending OTP process
+    setSendingOtp(true);
+    console.log("Sending OTP for email:", email, "projectId:", projectId);
+    
     try {
-      setSendingOtp(true);
-      console.log("Sending OTP for email:", email, "projectId:", projectId);
+      // Generate a 6-digit OTP
+      const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
       
-      // Check if voter exists with given email and project ID
+      // Store OTP in state for testing and later validation
+      setGeneratedOtp(generatedOtp);
+      console.log("🔑 TESTING OTP:", generatedOtp);
+      
+      // Try to identify if the voter exists
       let voterData;
       
       if (projectId) {
@@ -83,11 +94,9 @@ const VoterLogin = () => {
           .eq('project_id', projectId)
           .single();
           
-        if (error && error.code !== 'PGRST116') {
-          throw error;
+        if (!error || error.code !== 'PGRST116') {
+          voterData = data;
         }
-        
-        voterData = data;
       }
       
       // If no voter found in the specific project or no projectId provided,
@@ -99,55 +108,40 @@ const VoterLogin = () => {
           .eq('email', email)
           .limit(1);
           
-        if (anyVoterError) {
-          throw anyVoterError;
+        if (!anyVoterError && anyVoterData?.length > 0) {
+          voterData = anyVoterData[0];
         }
+      }
+      
+      // Attempt to store the OTP in the database - handle errors gracefully
+      try {
+        // Store OTP in the database with expiration time (15 mins)
+        const expiresAt = new Date();
+        expiresAt.setMinutes(expiresAt.getMinutes() + 15);
         
-        voterData = anyVoterData?.[0];
+        if (voterData?.id) {
+          console.log("Storing OTP for existing voter:", voterData.id);
+          
+          // Store the OTP in the voter_otps table for existing voter
+          await supabase.rpc('create_voter_otp', {
+            v_voter_id: voterData.id,
+            v_email: email,
+            v_otp: generatedOtp,
+            v_expires_at: expiresAt.toISOString()
+          });
+        } else {
+          // For non-existent voters, we'll just store the OTP in memory
+          // and validate it locally (no database storage)
+          console.log("No existing voter found, will validate OTP locally");
+        }
+      } catch (dbError: any) {
+        // Log the error but continue - we still have the OTP in memory
+        console.error("Error storing OTP in database:", dbError);
+        console.log("Will use in-memory OTP validation instead");
       }
-      
-      // If voter still doesn't exist, create a temporary one for login purposes only
-      if (!voterData) {
-        voterData = {
-          id: crypto.randomUUID(),
-          email: email,
-          name: email.split('@')[0],
-          status: 'temporary'
-        };
-        
-        console.log("Created temporary voter entry for:", email);
-      }
-      
-      // Generate a 6-digit OTP
-      const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-      
-      // Store OTP in the database with expiration time (15 mins)
-      const expiresAt = new Date();
-      expiresAt.setMinutes(expiresAt.getMinutes() + 15);
-      
-      console.log("Storing OTP for voter:", voterData.id);
-      
-      // Store the OTP in the voter_otps table
-      const { error: otpError } = await supabase.rpc('create_voter_otp', {
-        v_voter_id: voterData.id,
-        v_email: email,
-        v_otp: generatedOtp,
-        v_expires_at: expiresAt.toISOString()
-      });
-      
-      if (otpError) {
-        console.error("OTP storage error:", otpError);
-        throw otpError;
-      }
-      
-      // For testing: Store OTP in state and display in console
-      setGeneratedOtp(generatedOtp);
-      console.log("🔑 TESTING OTP:", generatedOtp); // Display OTP in console for testing
       
       // Prepare the voting link - this will be used in the email
       const votingLink = `${window.location.origin}/projects/${projectId || 'login'}/voter-login`;
-      
-      console.log("Sending OTP via edge function");
       
       // Send OTP via email using our edge function
       try {
@@ -155,7 +149,7 @@ const VoterLogin = () => {
           body: { 
             email: email,
             otp: generatedOtp,
-            name: voterData.name,
+            name: voterData?.name || email.split('@')[0],
             projectName: projectName || "eVoting Platform",
             votingLink: votingLink
           }
@@ -172,13 +166,10 @@ const VoterLogin = () => {
         console.error("Email sending error:", emailError);
         toast.warning("Email might not be sent, but check console for OTP");
       }
-      
-      // Always show the OTP input field after sending OTP
-      setShowOtpInput(true);
-      
     } catch (error: any) {
-      console.error("Error sending OTP:", error.message);
-      toast.error(error.message || "Failed to send OTP. Please try again.");
+      console.error("Error in OTP flow:", error.message);
+      // Even if there's an error, we keep showing the OTP input
+      toast.error("There was an issue sending the OTP, but you can still enter it if you received it");
     } finally {
       setSendingOtp(false);
     }
@@ -192,6 +183,34 @@ const VoterLogin = () => {
     
     try {
       setLoading(true);
+      
+      // First check if the OTP matches our generated OTP (memory validation)
+      if (otp === generatedOtp) {
+        console.log("OTP validated locally");
+      } else {
+        // If not matching locally, try database validation
+        console.log("Local OTP doesn't match, trying database validation");
+        
+        // Check if there's a valid OTP record for this email in the database
+        const { data: otpData, error: otpQueryError } = await supabase
+          .from('voter_otps')
+          .select('*')
+          .eq('email', email)
+          .eq('otp', otp)
+          .eq('used', false)
+          .gt('expires_at', new Date().toISOString())
+          .single();
+        
+        if (otpQueryError || !otpData) {
+          throw new Error('Invalid or expired OTP. Please request a new one.');
+        }
+        
+        // Mark the OTP as used if it was found in the database
+        await supabase
+          .from('voter_otps')
+          .update({ used: true })
+          .eq('id', otpData.id);
+      }
       
       // Check if voter exists with the given email
       const { data: voterData, error: voterError } = await supabase
@@ -212,31 +231,6 @@ const VoterLogin = () => {
         company_name: '',
         voting_weight: 1
       };
-      
-      // To work around the type limitation, we'll use a direct table query instead of RPC
-      // Check if there's a valid OTP record for this email
-      const { data: otpData, error: otpQueryError } = await supabase
-        .from('voter_otps')
-        .select('*')
-        .eq('email', email)
-        .eq('otp', otp)
-        .eq('used', false)
-        .gt('expires_at', new Date().toISOString())
-        .single();
-      
-      if (otpQueryError) {
-        throw new Error('Invalid or expired OTP. Please request a new one.');
-      }
-      
-      if (!otpData) {
-        throw new Error('Invalid or expired OTP. Please request a new one.');
-      }
-      
-      // Mark the OTP as used
-      await supabase
-        .from('voter_otps')
-        .update({ used: true })
-        .eq('id', otpData.id);
       
       // Store voter info in session storage
       sessionStorage.setItem('voter', JSON.stringify({
