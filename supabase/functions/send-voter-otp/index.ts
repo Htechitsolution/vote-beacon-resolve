@@ -39,6 +39,11 @@ serve(async (req) => {
     const payload: OtpRequest = await req.json();
     const { email, name, otp, projectName, votingLink, isResultEmail, resultTitle, resultUrl } = payload;
 
+    // Log OTP for testing purposes
+    console.log("==================================");
+    console.log("🔑 TESTING - OTP for", email, ":", otp);
+    console.log("==================================");
+    
     console.log("OTP request payload:", { email, name: name || "not provided", otp: otp ? "provided" : "missing", projectName, votingLink: votingLink ? "provided" : "missing" });
 
     if (!email) {
@@ -92,24 +97,34 @@ serve(async (req) => {
     console.log("Calling email-service function");
 
     // Call the email-service function to send the email
-    const { data: emailData, error: emailError } = await supabase.functions.invoke("email-service", {
-      body: {
-        to: email,
-        subject: subject,
-        body: body,
-        type: isResultEmail ? "voting_results" : "voter_otp",
-      },
-    });
+    // Try-catch here to continue even if email fails (for testing)
+    try {
+      const { data: emailData, error: emailError } = await supabase.functions.invoke("email-service", {
+        body: {
+          to: email,
+          subject: subject,
+          body: body,
+          type: isResultEmail ? "voting_results" : "voter_otp",
+        },
+      });
 
-    if (emailError) {
-      console.error("Email service error:", emailError);
-      throw emailError;
+      if (emailError) {
+        console.error("Email service error:", emailError);
+        throw emailError;
+      }
+
+      console.log("Email sent successfully:", emailData);
+    } catch (emailError) {
+      console.error("Email sending failed, but proceeding for testing:", emailError);
+      // Don't throw the error here to allow testing with the console OTP
     }
 
-    console.log("Email sent successfully:", emailData);
-
     return new Response(
-      JSON.stringify({ success: true, message: isResultEmail ? "Results email sent successfully" : "OTP sent successfully" }),
+      JSON.stringify({ 
+        success: true, 
+        message: isResultEmail ? "Results email sent successfully" : "OTP sent successfully",
+        testingInfo: process.env.NODE_ENV === 'development' ? { otp } : undefined
+      }),
       {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

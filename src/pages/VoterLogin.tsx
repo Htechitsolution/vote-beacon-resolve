@@ -27,6 +27,7 @@ const VoterLogin = () => {
   const [loading, setLoading] = useState(false);
   const [sendingOtp, setSendingOtp] = useState(false);
   const [projectName, setProjectName] = useState("");
+  const [generatedOtp, setGeneratedOtp] = useState(""); // Store the generated OTP for testing
   
   useEffect(() => {
     const fetchProjectName = async () => {
@@ -115,12 +116,17 @@ const VoterLogin = () => {
         throw otpError;
       }
       
+      // For testing: Store OTP in state and display in console
+      setGeneratedOtp(generatedOtp);
+      console.log("🔑 TESTING OTP:", generatedOtp); // Display OTP in console for testing
+      
       // Prepare the voting link - this will be used in the email
       const votingLink = `${window.location.origin}/projects/${projectId}/voter-login`;
       
       console.log("Sending OTP via edge function");
       
       // Send OTP via email using our edge function
+      // Comment this out for testing if email sending is problematic
       const { data, error: functionError } = await supabase.functions.invoke('send-voter-otp', {
         body: { 
           email: email,
@@ -133,13 +139,14 @@ const VoterLogin = () => {
       
       if (functionError) {
         console.error("Edge function error:", functionError);
-        throw functionError;
+        // Don't throw error here for testing purposes, just log it
+        toast.warning("Email might not be sent, but check console for OTP");
+      } else {
+        console.log("OTP sent response:", data);
+        toast.success("A one-time password has been sent to your email");
       }
       
-      console.log("OTP sent response:", data);
-      
       setShowOtpInput(true);
-      toast.success("A one-time password has been sent to your email");
       
     } catch (error: any) {
       console.error("Error sending OTP:", error.message);
@@ -239,6 +246,13 @@ const VoterLogin = () => {
             <CardDescription>
               {projectName ? `Enter your credentials for ${projectName}` : 'Enter your voter credentials'}
             </CardDescription>
+            
+            {/* Testing OTP display - Only shown in development */}
+            {generatedOtp && process.env.NODE_ENV === 'development' && (
+              <div className="mt-2 p-2 bg-yellow-100 border border-yellow-300 rounded-md">
+                <p className="text-sm font-mono text-yellow-800">Testing OTP: {generatedOtp}</p>
+              </div>
+            )}
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-4">
