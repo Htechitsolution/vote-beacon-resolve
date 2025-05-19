@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -214,20 +213,30 @@ const VoterLogin = () => {
         voting_weight: 1
       };
       
-      // Verify OTP against the email
-      const { data: otpIsValid, error: otpError } = await supabase
-        .rpc('verify_voter_otp_by_email', {
-          v_email: email,
-          v_otp: otp
-        });
-        
-      if (otpError) {
+      // To work around the type limitation, we'll use a direct table query instead of RPC
+      // Check if there's a valid OTP record for this email
+      const { data: otpData, error: otpQueryError } = await supabase
+        .from('voter_otps')
+        .select('*')
+        .eq('email', email)
+        .eq('otp', otp)
+        .eq('used', false)
+        .gt('expires_at', new Date().toISOString())
+        .single();
+      
+      if (otpQueryError) {
         throw new Error('Invalid or expired OTP. Please request a new one.');
       }
       
-      if (!otpIsValid) {
+      if (!otpData) {
         throw new Error('Invalid or expired OTP. Please request a new one.');
       }
+      
+      // Mark the OTP as used
+      await supabase
+        .from('voter_otps')
+        .update({ used: true })
+        .eq('id', otpData.id);
       
       // Store voter info in session storage
       sessionStorage.setItem('voter', JSON.stringify({
