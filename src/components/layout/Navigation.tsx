@@ -106,9 +106,6 @@ const Navigation = () => {
             </>
           ) : (
             <>
-              <Button asChild variant="ghost">
-                <Link to="/voter-login">Voter Login</Link>
-              </Button>
               <Button asChild variant="outline">
                 <Link to="/login">Admin Login</Link>
               </Button>
@@ -182,14 +179,6 @@ const Navigation = () => {
               </>
             ) : (
               <>
-                <Button
-                  asChild
-                  variant="ghost"
-                  className="justify-start"
-                  onClick={() => setIsOpen(false)}
-                >
-                  <Link to="/voter-login">Voter Login</Link>
-                </Button>
                 <Button
                   asChild
                   variant="ghost"

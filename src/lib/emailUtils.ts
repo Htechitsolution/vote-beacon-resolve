@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 // Email types
-export type EmailType = 'voter_otp' | 'reminder' | 'results' | 'password_reset' | 'voting_link';
+export type EmailType = 'reminder' | 'results' | 'password_reset';
 
 export interface EmailPayload {
   to: string;
@@ -32,27 +32,5 @@ export const sendEmail = async (payload: EmailPayload): Promise<{ success: boole
   } catch (error: any) {
     console.error("Exception in sending email:", error);
     return { success: false, message: error.message || "Failed to send email" };
-  }
-};
-
-export const sendVoterOTP = async (voterEmail: string, voterName: string, otp: string) => {
-  try {
-    const { data, error } = await supabase.functions.invoke('send-voter-otp', {
-      body: { email: voterEmail, name: voterName, otp }
-    });
-    
-    if (error) {
-      console.error("Error sending voter OTP:", error);
-      toast.error("Failed to send OTP to voter");
-      return { success: false, message: error.message };
-    }
-    
-    console.log("OTP sent successfully:", data);
-    toast.success("OTP sent to voter successfully");
-    return { success: true, message: "OTP sent successfully" };
-  } catch (error: any) {
-    console.error("Exception in sending OTP:", error);
-    toast.error(error.message || "Failed to send OTP");
-    return { success: false, message: error.message || "Failed to send OTP" };
   }
 };

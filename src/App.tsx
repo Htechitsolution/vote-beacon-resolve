@@ -18,9 +18,6 @@ import ProjectDetailPage from './pages/ProjectDetail';
 import AgendaDetailPage from './pages/AgendaDetail';
 import AgendaResultsPage from './pages/AgendaResults';
 import VoterManagementPage from './pages/VoterManagement';
-import VoterLoginPage from './pages/VoterLogin';
-import VoterDashboardPage from './pages/VoterDashboard';
-import VoterMeetingPage from './pages/VoterMeeting';
 import CheckoutPage from './pages/Checkout';
 import ProtectedRoute from './components/ProtectedRoute';
 import SuperAdminRoute from './components/SuperAdminRoute';
@@ -38,10 +35,6 @@ function App() {
         <Route path="/contact-us" element={<ContactUsPage />} />
         <Route path="/checkout" element={<CheckoutPage />} />
         
-        {/* Voter login routes */}
-        <Route path="/voter-login" element={<VoterLoginPage />} />
-        <Route path="/projects/:projectId/voter-login" element={<VoterLoginPage />} />
-        
         {/* Protected routes */}
         <Route element={<ProtectedRoute />}>
           <Route path="/profile" element={<ProfilePage />} />
@@ -56,10 +49,6 @@ function App() {
         <Route element={<SuperAdminRoute />}>
           <Route path="/admin-dashboard" element={<AdminDashboardPage />} />
         </Route>
-        
-        {/* Voter routes */}
-        <Route path="/projects/:projectId/voter-dashboard" element={<VoterDashboardPage />} />
-        <Route path="/voter/meeting/:projectId/:agendaId" element={<VoterMeetingPage />} />
         
         <Route path="*" element={<NotFoundPage />} />
       </Routes>

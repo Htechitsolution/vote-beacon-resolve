@@ -1,7 +1,5 @@
 
 project_id = "crnpusxrbjozxdeeaotw"
-[functions.send-voter-otp]
-verify_jwt = false
 [functions.email-service]
 verify_jwt = false
 [functions.reset-password]
