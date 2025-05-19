@@ -27,7 +27,6 @@ interface Agenda {
   start_date: string;
   end_date: string;
   project_id: string;
-  projects?: Project | null | any; // Make this more flexible to handle error objects
   project_name?: string;
 }
 
@@ -110,21 +109,21 @@ const VoterDashboard = () => {
             // First check if projects exists and is an object
             const projectsData = agenda.projects;
             if (projectsData && typeof projectsData === 'object') {
-              // If it has a name property that's a string, use it
-              if ('name' in projectsData && typeof projectsData.name === 'string') {
-                projectName = projectsData.name;
-              }
+              // Use optional chaining to safely access the name property
+              projectName = projectsData?.name?.toString() || 'Unknown Project';
             }
           } catch (e) {
             console.error("Error extracting project name:", e);
           }
           
-          // Create a new agenda object with the extracted project name
-          // and without the problematic projects property
-          const { projects, ...agendaWithoutProjects } = agenda;
-          
+          // Return a clean agenda object without the problematic 'projects' property
           return {
-            ...agendaWithoutProjects,
+            id: agenda.id,
+            title: agenda.title,
+            description: agenda.description,
+            start_date: agenda.start_date,
+            end_date: agenda.end_date,
+            project_id: agenda.project_id,
             project_name: projectName
           } as Agenda;
         });
