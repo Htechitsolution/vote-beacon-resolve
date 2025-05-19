@@ -57,7 +57,7 @@ const VoterDashboard = () => {
     try {
       setIsLoading(true);
       
-      // First get all agendas
+      // First get all agendas with project name
       const { data: agendas, error: agendasError } = await supabase
         .from('agendas')
         .select(`
@@ -67,7 +67,9 @@ const VoterDashboard = () => {
           start_date,
           end_date,
           project_id,
-          projects (name)
+          projects (
+            name
+          )
         `);
       
       if (agendasError) {
@@ -90,7 +92,7 @@ const VoterDashboard = () => {
         .filter(agenda => projectIds.includes(agenda.project_id))
         .map(agenda => ({
           ...agenda,
-          project_name: agenda.projects?.name || 'Unknown Project'
+          project_name: agenda.projects ? agenda.projects.name : 'Unknown Project'
         }));
       
       setAgendaItems(filteredAgendas);
