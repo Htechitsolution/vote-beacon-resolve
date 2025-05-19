@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -13,8 +14,9 @@ interface VoterSession {
   loggedInAt: string;
 }
 
+// Updated Project interface - make name optional since it might be an error object
 interface Project {
-  name: string;
+  name?: string;
 }
 
 interface Agenda {
@@ -24,7 +26,7 @@ interface Agenda {
   start_date: string;
   end_date: string;
   project_id: string;
-  projects: Project | null;
+  projects?: Project | null;
   project_name?: string;
 }
 
@@ -62,7 +64,7 @@ const VoterDashboard = () => {
       setIsLoading(true);
       
       // First get all agendas with project name
-      const { data: agendas, error: agendasError } = await supabase
+      const { data: agendasData, error: agendasError } = await supabase
         .from('agendas')
         .select(`
           id,
@@ -94,14 +96,26 @@ const VoterDashboard = () => {
       const projectIds = voterRecords.map(voter => voter.project_id);
       
       // Handle the case where agendas might be null or not an array
-      const validAgendas = Array.isArray(agendas) ? agendas : [];
+      const validAgendas = Array.isArray(agendasData) ? agendasData : [];
       
-      const filteredAgendas = validAgendas
+      // Safely map and filter the agendas
+      const filteredAgendas: Agenda[] = validAgendas
         .filter(agenda => projectIds.includes(agenda.project_id))
-        .map(agenda => ({
-          ...agenda,
-          project_name: agenda.projects && 'name' in agenda.projects ? agenda.projects.name : 'Unknown Project'
-        }));
+        .map(agenda => {
+          // Check if projects exists and if it has a name property that's a string
+          const projectName = agenda.projects && 
+                             typeof agenda.projects === 'object' && 
+                             agenda.projects !== null && 
+                             'name' in agenda.projects && 
+                             typeof agenda.projects.name === 'string' 
+                               ? agenda.projects.name 
+                               : 'Unknown Project';
+                               
+          return {
+            ...agenda,
+            project_name: projectName
+          };
+        });
       
       setAgendaItems(filteredAgendas);
       
