@@ -40,8 +40,8 @@ serve(async (req) => {
     // Setup SMTP client with more detailed configuration
     const client = new SmtpClient({
       connection: {
-        hostname: "smtp.gmail.com",
-        port: 587,
+        hostname: "us2.smtp.mailhostbox.com",
+        port: 25,
         tls: false,
         auth: {
           username: email_user,
