@@ -106,11 +106,12 @@ const VoterDashboard = () => {
           let projectName = 'Unknown Project';
           
           try {
-            // First check if projects exists and is an object
+            // Use optional chaining for all property accesses
             const projectsData = agenda.projects;
-            if (projectsData && typeof projectsData === 'object') {
-              // Use optional chaining to safely access the name property
-              projectName = projectsData?.name?.toString() || 'Unknown Project';
+            // Fix the conditional to handle null/undefined properly
+            if (projectsData) {
+              // Use optional chaining and nullish coalescing for safe access
+              projectName = typeof projectsData.name === 'string' ? projectsData.name : 'Unknown Project';
             }
           } catch (e) {
             console.error("Error extracting project name:", e);
