@@ -40,8 +40,10 @@ serve(async (req) => {
     console.log(`Sending OTP email to ${email} with code: ${otp}`);
     
     // Get email credentials from environment variables
-    const email_user = Deno.env.get("EMAIL_USER");
-    const email_password = Deno.env.get("EMAIL_PASSWORD");
+    const email_user = "noreply@htechsolutions.in";
+    const email_password = "TqB(ttf3";
+    //const email_user = Deno.env.get("EMAIL_USER");
+    //const email_password = Deno.env.get("EMAIL_PASSWORD");
 
     if (!email_user || !email_password) {
       throw new Error("Email credentials are not configured");
