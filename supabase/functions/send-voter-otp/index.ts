@@ -37,13 +37,12 @@ serve(async (req) => {
       );
     }
     
+    // Log OTP for testing purposes
     console.log(`Sending OTP email to ${email} with code: ${otp}`);
     
     // Get email credentials from environment variables
-    const email_user = "noreply@htechsolutions.in";
-    const email_password = "TqB(ttf3";
-    //const email_user = Deno.env.get("EMAIL_USER");
-    //const email_password = Deno.env.get("EMAIL_PASSWORD");
+    const email_user = Deno.env.get("EMAIL_USER") || "noreply@htechsolutions.in";
+    const email_password = Deno.env.get("EMAIL_PASSWORD") || "TqB(ttf3";
 
     if (!email_user || !email_password) {
       throw new Error("Email credentials are not configured");
@@ -71,7 +70,7 @@ serve(async (req) => {
         <div style="background-color: #f5f5f5; padding: 15px; text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 5px; border-radius: 4px; margin: 20px 0;">
           ${otp}
         </div>
-        <p>This code will expire in 15 minutes.</p>
+        <p>This code will expire in 5 minutes.</p>
         <p>If you did not request this code, please ignore this email.</p>
         <p style="margin-top: 30px; font-size: 12px; color: #666;">
           This is an automated message. Please do not reply to this email.

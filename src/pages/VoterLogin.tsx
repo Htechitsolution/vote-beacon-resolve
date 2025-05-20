@@ -32,7 +32,7 @@ const VoterLogin = () => {
     try {
       setIsGeneratingOtp(true);
       
-      // Check if voter exists
+      // Check if voter exists using select syntax compatible with Supabase
       const { data: voterData, error: voterError } = await supabase
         .from('voters')
         .select('id, name')
@@ -54,12 +54,34 @@ const VoterLogin = () => {
       const randomOtp = Math.floor(100000 + Math.random() * 900000).toString();
       setGeneratedOtp(randomOtp);
       setVoterId(voterData.id);
-      console.log("Generated OTP for debugging:", randomOtp); // Ensure OTP is logged to console
       
-      // In a real application, you would send this OTP via email
+      // Log OTP to console for testing
+      console.log("Generated OTP for testing:", randomOtp);
+      
+      // Store OTP in database with 5-minute expiration
+      const expirationTime = new Date();
+      expirationTime.setMinutes(expirationTime.getMinutes() + 5);
+      
+      const { data: functionData, error: functionError } = await supabase.rpc(
+        'create_voter_otp',
+        {
+          v_voter_id: voterData.id,
+          v_email: email,
+          v_otp: randomOtp,
+          v_expires_at: expirationTime.toISOString()
+        }
+      );
+      
+      if (functionError) {
+        console.error("Error storing OTP:", functionError);
+        toast.error("Failed to generate OTP: " + functionError.message);
+        return;
+      }
+      
+      // Send OTP via email
       const { success, message } = await sendVoterOTP(
         email,
-        voterData.name || 'Voter', // Provide a fallback if name is null
+        voterData.name || 'Voter',
         randomOtp,
         "The-eVoting",
         window.location.origin
@@ -90,13 +112,32 @@ const VoterLogin = () => {
       return;
     }
     
+    if (!voterId) {
+      toast.error("Session expired, please try again");
+      setShowOtpField(false);
+      return;
+    }
+    
     try {
       setIsVerifyingOtp(true);
       
-      // For demo purposes, we'll verify against the locally generated OTP
-      // In production, this should be validated on the server side
-      if (otp === generatedOtp && voterId) {
-        // Store voter id in local storage for session management
+      // Verify OTP using database function
+      const { data: isValid, error: verifyError } = await supabase.rpc(
+        'verify_voter_otp',
+        {
+          v_voter_id: voterId,
+          v_otp: otp
+        }
+      );
+      
+      if (verifyError) {
+        console.error("Error verifying OTP:", verifyError);
+        toast.error("Failed to verify OTP: " + verifyError.message);
+        return;
+      }
+      
+      if (isValid) {
+        // Store voter session in local storage
         localStorage.setItem('voterSession', JSON.stringify({
           voterId,
           email,
@@ -106,7 +147,7 @@ const VoterLogin = () => {
         toast.success("Login successful");
         navigate('/voter-dashboard');
       } else {
-        toast.error("Invalid OTP. Please try again");
+        toast.error("Invalid or expired OTP. Please try again");
       }
       
     } catch (error: any) {
