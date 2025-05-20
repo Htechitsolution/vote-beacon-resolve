@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -269,28 +268,24 @@ const AgendaDetail = () => {
     const defaultEndDate = new Date();
     defaultEndDate.setDate(defaultEndDate.getDate() + 7);
     
-    // Format for date input
-    const dateStr = defaultEndDate.toISOString().split('T')[0];
+    // Format for datetime-local input
+    const dateTimeStr = new Date().toISOString().slice(0, 16);
     
-    // Format for time input - current time
-    const timeStr = new Date().toTimeString().slice(0, 5);
-    
-    setVotingEndDate(dateStr);
-    setVotingEndTime(timeStr);
+    setVotingEndDate(dateTimeStr);
     setIsStartVotingDialogOpen(true);
   };
 
   const handleConfirmStartVoting = async () => {
-    if (!votingEndDate || !votingEndTime) {
-      toast.error('Please select both end date and time');
+    if (!votingEndDate) {
+      toast.error('Please select an end date and time');
       return;
     }
     
     try {
       setIsUpdatingStatus(true);
       
-      // Combine date and time into a single DateTime
-      const endDateTime = new Date(`${votingEndDate}T${votingEndTime}`);
+      // Parse the datetime input value
+      const endDateTime = new Date(votingEndDate);
       
       const { error } = await supabase
         .from('agendas')
@@ -326,34 +321,28 @@ const AgendaDetail = () => {
     // Set current end date as default
     if (agenda?.end_date) {
       const endDate = new Date(agenda.end_date);
-      
-      // Format for date input
-      const dateStr = endDate.toISOString().split('T')[0];
-      
-      // Format for time input
-      const timeStr = endDate.toTimeString().slice(0, 5);
-      
-      setVotingEndDate(dateStr);
-      setVotingEndTime(timeStr);
+      // Format for datetime-local input (YYYY-MM-DDThh:mm)
+      const dateTimeStr = endDate.toISOString().slice(0, 16);
+      setVotingEndDate(dateTimeStr);
     }
     
     setIsExtendVotingDialogOpen(true);
   };
 
   const handleConfirmExtendVoting = async () => {
-    if (!votingEndDate || !votingEndTime) {
-      toast.error('Please select both end date and time');
+    if (!votingEndDate) {
+      toast.error('Please select a new end date and time');
       return;
     }
     
     try {
       setIsUpdatingStatus(true);
       
-      // Combine date and time into a single DateTime
-      const endDateTime = new Date(`${votingEndDate}T${votingEndTime}`);
+      // Parse the datetime input value
+      const endDateTime = new Date(votingEndDate);
       
       // Check if new end date is after current end date
-      if (agenda?.end_date && new Date(endDateTime) <= new Date(agenda.end_date)) {
+      if (agenda?.end_date && endDateTime <= new Date(agenda.end_date)) {
         toast.error('New end date must be after current end date');
         return;
       }
@@ -449,21 +438,21 @@ const AgendaDetail = () => {
         <Breadcrumb className="mb-4">
           <BreadcrumbList>
             <BreadcrumbItem>
-              <BreadcrumbLink as={Link} to="/">
-                Home
-              </BreadcrumbLink>
+              <Link to="/">
+                <BreadcrumbLink>Home</BreadcrumbLink>
+              </Link>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
-              <BreadcrumbLink as={Link} to="/projects">
-                Projects
-              </BreadcrumbLink>
+              <Link to="/projects">
+                <BreadcrumbLink>Projects</BreadcrumbLink>
+              </Link>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
-              <BreadcrumbLink as={Link} to={`/projects/${projectId}`}>
-                {project.title}
-              </BreadcrumbLink>
+              <Link to={`/projects/${projectId}`}>
+                <BreadcrumbLink>{project.title}</BreadcrumbLink>
+              </Link>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
@@ -791,23 +780,12 @@ const AgendaDetail = () => {
           
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="endDate">Voting End Date</Label>
+              <Label htmlFor="endDateTime">Voting End Date and Time</Label>
               <Input
-                id="endDate"
-                type="date"
+                id="endDateTime"
+                type="datetime-local"
                 value={votingEndDate}
                 onChange={(e) => setVotingEndDate(e.target.value)}
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="endTime">Voting End Time</Label>
-              <Input
-                id="endTime"
-                type="time"
-                value={votingEndTime}
-                onChange={(e) => setVotingEndTime(e.target.value)}
                 required
               />
             </div>
@@ -852,29 +830,18 @@ const AgendaDetail = () => {
           <div className="space-y-4 py-4">
             <div>
               <Label className="text-sm font-semibold">Current End Date & Time</Label>
-              <p className="text-gray-700">{formatDate(agenda.end_date)}</p>
+              <p className="text-gray-700">{formatDate(agenda?.end_date)}</p>
             </div>
             
             <Separator />
             
             <div className="space-y-2">
-              <Label htmlFor="extendDate">New End Date</Label>
+              <Label htmlFor="extendDateTime">New End Date and Time</Label>
               <Input
-                id="extendDate"
-                type="date"
+                id="extendDateTime"
+                type="datetime-local"
                 value={votingEndDate}
                 onChange={(e) => setVotingEndDate(e.target.value)}
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="extendTime">New End Time</Label>
-              <Input
-                id="extendTime"
-                type="time"
-                value={votingEndTime}
-                onChange={(e) => setVotingEndTime(e.target.value)}
                 required
               />
             </div>
