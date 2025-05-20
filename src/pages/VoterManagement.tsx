@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,7 +35,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import Papa from "papaparse";
-import { sendVoterOTP } from "@/lib/emailUtils";
+import { sendVoterOTP, sendEmail, createEmailTemplate } from "@/lib/emailUtils";
 
 type Voter = {
   id: string;
@@ -59,13 +60,35 @@ const VoterManagement = () => {
   const [sendingEmail, setSendingEmail] = useState(false);
   const [selectedVoter, setSelectedVoter] = useState<Voter | null>(null);
   const [totalVotingWeight, setTotalVotingWeight] = useState(0);
+  const [agendaTitle, setAgendaTitle] = useState("");
   const { user } = useAuth();
-  const { projectId } = useParams();
+  const { projectId, agendaId } = useParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchVoters();
+    fetchAgendaTitle();
   }, []);
+
+  const fetchAgendaTitle = async () => {
+    if (agendaId) {
+      try {
+        const { data, error } = await supabase
+          .from('agendas')
+          .select('title')
+          .eq('id', agendaId)
+          .single();
+          
+        if (error) throw error;
+        
+        if (data) {
+          setAgendaTitle(data.title);
+        }
+      } catch (error) {
+        console.error("Error fetching agenda title:", error);
+      }
+    }
+  };
 
   const fetchVoters = async () => {
     try {
@@ -76,11 +99,18 @@ const VoterManagement = () => {
         return;
       }
 
-      // Fetch voters for the project
-      const { data, error } = await supabase
+      // Fetch voters for the specific agenda if agendaId is provided, otherwise fetch for the project
+      let query = supabase
         .from('voters')
-        .select('*')
-        .eq('project_id', projectId);
+        .select('*');
+        
+      if (agendaId) {
+        query = query.eq('agenda_id', agendaId);
+      } else {
+        query = query.eq('project_id', projectId).is('agenda_id', null);
+      }
+      
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -108,6 +138,11 @@ const VoterManagement = () => {
     setNewVoterWeight(1);
     setIsAddingVoterDialogOpen(true);
   };
+  
+  // Generate unique voter ID
+  const generateVoterId = () => {
+    return Math.floor(1000000 + Math.random() * 9000000).toString();
+  };
 
   const handleAddVoter = async () => {
     try {
@@ -128,17 +163,24 @@ const VoterManagement = () => {
         return;
       }
 
-      // Check if the email already exists for this project
+      const cleanEmail = newVoterEmail.toLowerCase();
+      
+      // Check if the email already exists for this specific agenda or project
       const { data: existingVoter, error: existingVoterError } = await supabase
         .from('voters')
         .select('*')
         .eq('project_id', projectId)
-        .eq('email', newVoterEmail.toLowerCase());
-
+        .eq('email', cleanEmail);
+        
       if (existingVoterError) throw existingVoterError;
 
-      if (existingVoter && existingVoter.length > 0) {
-        toast.error("This email is already registered for this project.");
+      // For agenda-specific voters, only check for duplicates in the same agenda
+      const isDuplicate = agendaId 
+        ? existingVoter?.some(voter => voter.agenda_id === agendaId)
+        : existingVoter?.some(voter => voter.agenda_id === null);
+        
+      if (isDuplicate) {
+        toast.error("This email is already registered for this " + (agendaId ? "meeting" : "project"));
         return;
       }
 
@@ -147,13 +189,21 @@ const VoterManagement = () => {
       let votingWeightToUse = newVoterWeight;
       
       if (newVoterCompany) {
-        const { data: sameCompanyVoters, error: companyError } = await supabase
+        let query = supabase
           .from('voters')
           .select('voting_weight')
           .eq('project_id', projectId)
           .eq('company_name', newVoterCompany)
           .order('voting_weight', { ascending: false })
           .limit(1);
+          
+        if (agendaId) {
+          query = query.eq('agenda_id', agendaId);
+        } else {
+          query = query.is('agenda_id', null);
+        }
+          
+        const { data: sameCompanyVoters, error: companyError } = await query;
           
         if (companyError) throw companyError;
         
@@ -164,16 +214,24 @@ const VoterManagement = () => {
         }
       }
 
+      // Generate voter ID
+      const voterId = generateVoterId();
+      const defaultPassword = `Voter@${voterId}`;
+      
       // Insert the new voter with potentially adjusted voting weight
       const { data, error } = await supabase
         .from('voters')
         .insert([
           {
             project_id: projectId,
+            agenda_id: agendaId || null, // Set agenda_id if provided, otherwise null
             name: newVoterName,
-            email: newVoterEmail.toLowerCase(),
+            email: cleanEmail,
             company_name: newVoterCompany || null,
-            voting_weight: votingWeightToUse
+            voting_weight: votingWeightToUse,
+            voter_id: voterId,
+            password: defaultPassword,
+            force_reset_password: true,
           },
         ])
         .select();
@@ -181,6 +239,47 @@ const VoterManagement = () => {
       if (error) throw error;
 
       toast.success("Voter added successfully!");
+      
+      // Send welcome email with login credentials
+      const projectResponse = await supabase
+        .from('projects')
+        .select('title')
+        .eq('id', projectId)
+        .single();
+      
+      if (!projectResponse.error && projectResponse.data) {
+        const projectName = agendaTitle || projectResponse.data.title;
+        const loginLink = `${window.location.origin}/voter-login`;
+        
+        // Create email body
+        const emailBody = `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2>Welcome to ${projectName}</h2>
+            <p>Hello ${newVoterName},</p>
+            <p>You have been registered as a voter for: <strong>${projectName}</strong></p>
+            <p>Your login credentials:</p>
+            <ul>
+              <li><strong>Email:</strong> ${cleanEmail}</li>
+              <li><strong>Password:</strong> ${defaultPassword}</li>
+            </ul>
+            <p>Please click the link below to access the voting portal:</p>
+            <p><a href="${loginLink}" style="display: inline-block; background-color: #4CAF50; color: white; padding: 10px 15px; text-decoration: none; border-radius: 5px;">Go to Voting Portal</a></p>
+            <p>If the button above doesn't work, copy and paste this URL into your browser:</p>
+            <p>${loginLink}</p>
+            <p>You will be asked to change your password on first login.</p>
+            <p>Thank you,<br>The-eVoting Team</p>
+          </div>
+        `;
+        
+        await sendEmail({
+          to: cleanEmail,
+          subject: `Your login details for ${projectName}`,
+          body: emailBody,
+          type: 'registration',
+          name: newVoterName
+        });
+      }
+      
       setIsAddingVoterDialogOpen(false);
       fetchVoters();
     } catch (error: any) {
@@ -221,7 +320,7 @@ const VoterManagement = () => {
           email: voter.email,
           name: voter.name || 'Voter',
           otp,
-          projectName: projectData?.title || 'Meeting',
+          projectName: agendaTitle || projectData?.title || 'Meeting',
           votingLink: `${window.location.origin}/projects/${projectId}/voter-login`
         }
       });
@@ -325,11 +424,19 @@ const VoterManagement = () => {
         }
         
         // Check if voter exists
-        const { data: existingVoter } = await supabase
+        const query = supabase
           .from('voters')
           .select('id')
           .eq('project_id', projectId)
           .eq('email', row.email.toLowerCase());
+          
+        if (agendaId) {
+          query.eq('agenda_id', agendaId);
+        } else {
+          query.is('agenda_id', null);
+        }
+        
+        const { data: existingVoter } = await query;
           
         if (existingVoter && existingVoter.length > 0) {
           errors.push(`Email already exists: ${row.email}`);
@@ -337,15 +444,23 @@ const VoterManagement = () => {
           continue;
         }
         
+        // Generate voter ID and password
+        const voterId = generateVoterId();
+        const defaultPassword = `Voter@${voterId}`;
+        
         // Add new voter
         const { error } = await supabase
           .from('voters')
           .insert([{
             project_id: projectId,
+            agenda_id: agendaId || null,
             name: row.name,
             email: row.email.toLowerCase(),
             company_name: row.company || null,
-            voting_weight: parseFloat(row.weight) || 1
+            voting_weight: parseFloat(row.weight) || 1,
+            voter_id: voterId,
+            password: defaultPassword,
+            force_reset_password: true
           }]);
           
         if (error) {
@@ -353,6 +468,50 @@ const VoterManagement = () => {
           failCount++;
         } else {
           successCount++;
+          
+          // Send welcome email with login credentials
+          try {
+            const projectResponse = await supabase
+              .from('projects')
+              .select('title')
+              .eq('id', projectId)
+              .single();
+            
+            if (!projectResponse.error && projectResponse.data) {
+              const projectName = agendaTitle || projectResponse.data.title;
+              const loginLink = `${window.location.origin}/voter-login`;
+              
+              // Create email body
+              const emailBody = `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                  <h2>Welcome to ${projectName}</h2>
+                  <p>Hello ${row.name},</p>
+                  <p>You have been registered as a voter for: <strong>${projectName}</strong></p>
+                  <p>Your login credentials:</p>
+                  <ul>
+                    <li><strong>Email:</strong> ${row.email.toLowerCase()}</li>
+                    <li><strong>Password:</strong> ${defaultPassword}</li>
+                  </ul>
+                  <p>Please click the link below to access the voting portal:</p>
+                  <p><a href="${loginLink}" style="display: inline-block; background-color: #4CAF50; color: white; padding: 10px 15px; text-decoration: none; border-radius: 5px;">Go to Voting Portal</a></p>
+                  <p>If the button above doesn't work, copy and paste this URL into your browser:</p>
+                  <p>${loginLink}</p>
+                  <p>You will be asked to change your password on first login.</p>
+                  <p>Thank you,<br>The-eVoting Team</p>
+                </div>
+              `;
+              
+              await sendEmail({
+                to: row.email.toLowerCase(),
+                subject: `Your login details for ${projectName}`,
+                body: emailBody,
+                type: 'registration',
+                name: row.name
+              });
+            }
+          } catch (emailError) {
+            console.error("Failed to send welcome email:", emailError);
+          }
         }
       }
       
@@ -435,7 +594,10 @@ const VoterManagement = () => {
         </Breadcrumb>
 
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">Voter Management</h1>
+          <h1 className="text-3xl font-bold">
+            Voter Management
+            {agendaTitle ? ` - ${agendaTitle}` : ''}
+          </h1>
           <div className="flex gap-2">
             <Button
               variant="outline"
@@ -553,7 +715,7 @@ const VoterManagement = () => {
           <DialogHeader>
             <DialogTitle>Add New Voter</DialogTitle>
             <DialogDescription>
-              Add a new voter to this project.
+              Add a new voter to this {agendaId ? "meeting" : "project"}.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">

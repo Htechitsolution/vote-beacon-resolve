@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -124,6 +123,7 @@ const AgendaDetail = () => {
   const [isStartVotingDialogOpen, setIsStartVotingDialogOpen] = useState(false);
   const [isExtendEndDateDialogOpen, setIsExtendEndDateDialogOpen] = useState(false);
   const [selectedEndDate, setSelectedEndDate] = useState<Date | null>(null);
+  const [selectedEndTime, setSelectedEndTime] = useState<string>("23:59");
   const [requiredApproval, setRequiredApproval] = useState<number>(50);
   const [selectedAgendaItem, setSelectedAgendaItem] = useState<string | null>(null);
   const [voterVotes, setVoterVotes] = useState<Record<string, Record<string, string>>>({});
@@ -279,12 +279,17 @@ const AgendaDetail = () => {
         return;
       }
       
+      // Combine date and time
+      const [hours, minutes] = selectedEndTime.split(':').map(Number);
+      const endDateTime = new Date(selectedEndDate);
+      endDateTime.setHours(hours, minutes, 0, 0);
+      
       const { error } = await supabase
         .from('agendas')
         .update({ 
           status: 'live', 
           start_date: new Date().toISOString(),
-          end_date: selectedEndDate.toISOString()
+          end_date: endDateTime.toISOString()
         })
         .eq('id', agendaId);
         
@@ -310,9 +315,14 @@ const AgendaDetail = () => {
         return;
       }
       
+      // Combine date and time
+      const [hours, minutes] = selectedEndTime.split(':').map(Number);
+      const endDateTime = new Date(selectedEndDate);
+      endDateTime.setHours(hours, minutes, 0, 0);
+      
       const { error } = await supabase
         .from('agendas')
-        .update({ end_date: selectedEndDate.toISOString() })
+        .update({ end_date: endDateTime.toISOString() })
         .eq('id', agendaId);
         
       if (error) throw error;
@@ -562,6 +572,16 @@ const AgendaDetail = () => {
                   </Button>
                 )}
                 
+                {isAdmin && agenda.status === 'draft' && (
+                  <Button
+                    onClick={handleAddAgendaItem}
+                    className="bg-evoting-600 hover:bg-evoting-700 text-white ml-auto"
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Agenda
+                  </Button>
+                )}
+                
                 {isAdmin && agenda.status === 'live' && (
                   <>
                     <Button 
@@ -629,10 +649,13 @@ const AgendaDetail = () => {
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Agenda Information</CardTitle>
                 {isAdmin && agenda.status === 'draft' && (
-                  <Button onClick={handleAddAgendaItem} className="bg-evoting-600 hover:bg-evoting-700 text-white">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Agenda
-                  </Button>
+                  <div className="hidden">
+                    {/* We're hiding this button as it's moved to the top bar */}
+                    <Button onClick={handleAddAgendaItem} className="bg-evoting-600 hover:bg-evoting-700 text-white">
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Agenda
+                    </Button>
+                  </div>
                 )}
               </CardHeader>
               <CardContent>
@@ -930,6 +953,17 @@ const AgendaDetail = () => {
                 </PopoverContent>
               </Popover>
             </div>
+            
+            <div className="flex flex-col space-y-2">
+              <Label htmlFor="endTime">End Time</Label>
+              <Input
+                id="endTime"
+                type="time"
+                value={selectedEndTime}
+                onChange={(e) => setSelectedEndTime(e.target.value)}
+              />
+            </div>
+            
             <div className="bg-amber-50 border border-amber-200 rounded-md p-3 flex items-start gap-2">
               <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
               <p className="text-sm text-amber-700">
@@ -961,7 +995,7 @@ const AgendaDetail = () => {
           <DialogHeader>
             <DialogTitle>Extend End Date</DialogTitle>
             <DialogDescription>
-              Please select a new end date for the voting period.
+              Please select a new end date and time for the voting period.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col space-y-4 py-4">
@@ -987,6 +1021,16 @@ const AgendaDetail = () => {
                   />
                 </PopoverContent>
               </Popover>
+            </div>
+            
+            <div className="flex flex-col space-y-2">
+              <Label htmlFor="endTime">New End Time</Label>
+              <Input
+                id="endTime"
+                type="time"
+                value={selectedEndTime}
+                onChange={(e) => setSelectedEndTime(e.target.value)}
+              />
             </div>
           </div>
           <DialogFooter className="flex gap-2 sm:justify-end">
