@@ -5,6 +5,7 @@ import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Database } from '@/integrations/supabase/types';
+import { generateOTP } from '@/lib/utils';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
 
@@ -19,6 +20,9 @@ interface AuthContextType {
   isSuper: boolean;
   resetPassword: (email: string) => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<void>;
+  pendingVoterEmail: string | null;
+  initiateVoterLogin: (email: string) => Promise<void>;
+  verifyVoterOTP: (otp: string) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -28,6 +32,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [pendingVoterEmail, setPendingVoterEmail] = useState<string | null>(null);
+  const [pendingVoterOTP, setPendingVoterOTP] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -195,6 +201,136 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Voter OTP login methods
+  const initiateVoterLogin = async (email: string) => {
+    try {
+      setIsLoading(true);
+      // First check if this voter exists
+      const { data: voter, error: voterError } = await supabase
+        .from('voters')
+        .select('*')
+        .eq('email', email.toLowerCase())
+        .single();
+      
+      if (voterError || !voter) {
+        throw new Error('No voter found with this email address');
+      }
+      
+      // Generate OTP
+      const otp = generateOTP();
+      setPendingVoterEmail(email);
+      setPendingVoterOTP(otp);
+      
+      // Store OTP in database
+      const { error: otpError } = await supabase.rpc('create_voter_otp', {
+        v_voter_id: voter.id,
+        v_email: email.toLowerCase(),
+        v_otp: otp,
+        v_expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString() // 30 minutes expiry
+      });
+      
+      if (otpError) throw otpError;
+      
+      // Send OTP email
+      const projectResponse = await supabase
+        .from('projects')
+        .select('name')
+        .eq('id', voter.project_id)
+        .single();
+      
+      const projectName = projectResponse.data?.name || 'eVoting Meeting';
+      
+      const response = await fetch(`${window.location.origin}/functions/v1/send-voter-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: email.toLowerCase(),
+          name: voter.name || 'Voter',
+          otp: otp,
+          projectName: projectName,
+          votingLink: `${window.location.origin}/voter-verify`
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to send OTP email');
+      }
+
+      console.log('OTP sent to voter:', otp); // For development purposes
+      
+    } catch (error: any) {
+      console.error('Error initiating voter login:', error);
+      setPendingVoterEmail(null);
+      setPendingVoterOTP(null);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const verifyVoterOTP = async (enteredOTP: string): Promise<boolean> => {
+    if (!pendingVoterEmail || !pendingVoterOTP) return false;
+    
+    try {
+      setIsLoading(true);
+      
+      // Find voter
+      const { data: voter, error: voterError } = await supabase
+        .from('voters')
+        .select('*')
+        .eq('email', pendingVoterEmail.toLowerCase())
+        .single();
+      
+      if (voterError || !voter) {
+        throw new Error('Voter not found');
+      }
+      
+      // For development - allow direct match with stored OTP
+      if (enteredOTP === pendingVoterOTP) {
+        // Create session for voter
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: pendingVoterEmail,
+          password: enteredOTP
+        });
+        
+        if (signInError) {
+          // If error (likely because no user exists with this email), try to verify via database function
+          const { data: isValid, error: verifyError } = await supabase.rpc('verify_voter_otp', {
+            v_voter_id: voter.id,
+            v_otp: enteredOTP
+          });
+          
+          if (verifyError || !isValid) {
+            throw new Error('Invalid OTP');
+          }
+          
+          // OTP is valid, create a session manually
+          // For now, we'll just return true and handle this on the frontend
+          setPendingVoterEmail(null);
+          setPendingVoterOTP(null);
+          return true;
+        }
+        
+        // SignIn worked - we have a session now
+        setPendingVoterEmail(null);
+        setPendingVoterOTP(null);
+        return true;
+      }
+      
+      // If we got here, OTP didn't match
+      return false;
+      
+    } catch (error: any) {
+      console.error('Error verifying voter OTP:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const isSuper = profile?.role === 'super_admin';
 
   return (
@@ -208,7 +344,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       signOut,
       isSuper,
       resetPassword,
-      updateProfile
+      updateProfile,
+      pendingVoterEmail,
+      initiateVoterLogin,
+      verifyVoterOTP
     }}>
       {children}
     </AuthContext.Provider>

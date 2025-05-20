@@ -19,6 +19,9 @@ import AgendaDetailPage from './pages/AgendaDetail';
 import AgendaResultsPage from './pages/AgendaResults';
 import VoterManagementPage from './pages/VoterManagement';
 import CheckoutPage from './pages/Checkout';
+import VoterLoginPage from './pages/VoterLogin';
+import VoterVerifyPage from './pages/VoterVerify';
+import VoterDashboardPage from './pages/VoterDashboard';
 import ProtectedRoute from './components/ProtectedRoute';
 import SuperAdminRoute from './components/SuperAdminRoute';
 
@@ -28,6 +31,8 @@ function App() {
       <Routes>
         <Route path="/" element={<IndexPage />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/voter-login" element={<VoterLoginPage />} />
+        <Route path="/voter-verify" element={<VoterVerifyPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/terms" element={<TermsPage />} />
@@ -43,6 +48,7 @@ function App() {
           <Route path="/projects/:projectId/agenda/:agendaId" element={<AgendaDetailPage />} />
           <Route path="/projects/:projectId/agenda/:agendaId/results" element={<AgendaResultsPage />} />
           <Route path="/projects/:projectId/voters" element={<VoterManagementPage />} />
+          <Route path="/voter-dashboard" element={<VoterDashboardPage />} />
         </Route>
         
         {/* Super admin routes */}
