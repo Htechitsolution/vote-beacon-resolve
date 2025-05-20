@@ -19,6 +19,8 @@ import AgendaDetailPage from './pages/AgendaDetail';
 import AgendaResultsPage from './pages/AgendaResults';
 import VoterManagementPage from './pages/VoterManagement';
 import CheckoutPage from './pages/Checkout';
+import VoterLoginPage from './pages/VoterLogin';
+import VoterDashboardPage from './pages/VoterDashboard';
 import ProtectedRoute from './components/ProtectedRoute';
 import SuperAdminRoute from './components/SuperAdminRoute';
 
@@ -34,6 +36,10 @@ function App() {
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/contact-us" element={<ContactUsPage />} />
         <Route path="/checkout" element={<CheckoutPage />} />
+        
+        {/* Voter routes */}
+        <Route path="/voter-login" element={<VoterLoginPage />} />
+        <Route path="/voter-dashboard" element={<VoterDashboardPage />} />
         
         {/* Protected routes */}
         <Route element={<ProtectedRoute />}>
