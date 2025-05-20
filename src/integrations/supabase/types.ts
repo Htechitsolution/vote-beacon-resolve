@@ -247,8 +247,10 @@ export type Database = {
           company_name: string | null
           created_at: string
           email: string
+          force_reset_password: boolean | null
           id: string
           name: string | null
+          password: string | null
           project_id: string
           status: string | null
           updated_at: string
@@ -259,8 +261,10 @@ export type Database = {
           company_name?: string | null
           created_at?: string
           email: string
+          force_reset_password?: boolean | null
           id?: string
           name?: string | null
+          password?: string | null
           project_id: string
           status?: string | null
           updated_at?: string
@@ -271,8 +275,10 @@ export type Database = {
           company_name?: string | null
           created_at?: string
           email?: string
+          force_reset_password?: boolean | null
           id?: string
           name?: string | null
+          password?: string | null
           project_id?: string
           status?: string | null
           updated_at?: string
