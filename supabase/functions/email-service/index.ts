@@ -8,11 +8,20 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-interface EmailPayload {
+type EmailType = 
+  | 'voter_otp' 
+  | 'password_reset' 
+  | 'contact_form' 
+  | 'credit_purchase' 
+  | 'voting_results' 
+  | 'voting_started' 
+  | 'voting_ended';
+
+interface EmailBasePayload {
   to: string;
   subject: string;
   body: string;
-  type: string;
+  type: EmailType;
   replyTo?: string;
   name?: string;
 }
@@ -24,17 +33,15 @@ serve(async (req) => {
   }
 
   try {
-    const email_user = "noreply@htechsolutions.in";
-    const email_password = "TqB(ttf3";
-    //const email_user = Deno.env.get("EMAIL_USER");
-    //const email_password = Deno.env.get("EMAIL_PASSWORD");
+    const email_user = Deno.env.get("EMAIL_USER") || "noreply@htechsolutions.in";
+    const email_password = Deno.env.get("EMAIL_PASSWORD") || "TqB(ttf3";
 
     if (!email_user || !email_password) {
       console.error("Missing email credentials", { user: email_user ? "set" : "missing", password: email_password ? "set" : "missing" });
       throw new Error("Email service credentials not configured");
     }
 
-    const payload: EmailPayload = await req.json();
+    const payload: EmailBasePayload = await req.json();
     const { to, subject, body, type, replyTo, name } = payload;
 
     console.log(`Processing ${type} email to ${to}`);

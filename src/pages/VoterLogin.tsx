@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { Vote as VoteIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import Footer from "@/components/layout/Footer";
-import { sendVoterOTP } from "@/lib/emailUtils";
+import { sendVoterOTP } from "@/lib/emailService";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 
 const VoterLogin = () => {
@@ -18,7 +18,6 @@ const VoterLogin = () => {
   const [isGeneratingOtp, setIsGeneratingOtp] = useState(false);
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
   const [showOtpField, setShowOtpField] = useState(false);
-  const [generatedOtp, setGeneratedOtp] = useState("");
   const [voterId, setVoterId] = useState<string | null>(null);
 
   const handleGenerateOtp = async (e: React.FormEvent) => {
@@ -36,7 +35,7 @@ const VoterLogin = () => {
       const { data: voterData, error: voterError } = await supabase
         .from('voters')
         .select('id, name')
-        .eq('email', email)
+        .eq('email', email.toLowerCase())
         .maybeSingle();
       
       if (voterError) {
@@ -52,7 +51,6 @@ const VoterLogin = () => {
       
       // Generate a random 6-digit OTP
       const randomOtp = Math.floor(100000 + Math.random() * 900000).toString();
-      setGeneratedOtp(randomOtp);
       setVoterId(voterData.id);
       
       // Log OTP to console for testing
@@ -66,7 +64,7 @@ const VoterLogin = () => {
         'create_voter_otp',
         {
           v_voter_id: voterData.id,
-          v_email: email,
+          v_email: email.toLowerCase(),
           v_otp: randomOtp,
           v_expires_at: expirationTime.toISOString()
         }
@@ -92,9 +90,10 @@ const VoterLogin = () => {
         return;
       }
       
-      // Show OTP input field
+      // Show OTP input field and auto-fill it for testing
       setShowOtpField(true);
-      toast.success("OTP has been sent to your email");
+      setOtp(randomOtp); // Pre-fill the OTP for testing purposes
+      toast.success("OTP has been sent to your email and pre-filled for testing");
       
     } catch (error: any) {
       console.error("Error generating OTP:", error);
@@ -217,7 +216,7 @@ const VoterLogin = () => {
           ) : (
             <form onSubmit={handleVerifyOtp} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="otp">Enter OTP</Label>
+                <Label htmlFor="otp">Enter OTP (Pre-filled for testing)</Label>
                 <div className="flex flex-col items-center gap-4">
                   <InputOTP 
                     value={otp}
@@ -231,7 +230,9 @@ const VoterLogin = () => {
                       </InputOTPGroup>
                     )}
                   />
-                  <p className="text-xs text-gray-500">A 6-digit code has been sent to your email</p>
+                  <p className="text-xs text-gray-500">
+                    For testing purposes, the OTP has been pre-filled in the input boxes above
+                  </p>
                 </div>
               </div>
               
