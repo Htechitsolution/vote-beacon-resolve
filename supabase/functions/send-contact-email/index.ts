@@ -20,11 +20,8 @@ serve(async (req) => {
   }
 
   try {
-    
-    const email_user = "noreply@htechsolutions.in";
-    const email_password = "TqB(ttf3";
-    //const email_user = Deno.env.get("EMAIL_USER");
-    //const email_password = Deno.env.get("EMAIL_PASSWORD");
+    const email_user = Deno.env.get("EMAIL_USER");
+    const email_password = Deno.env.get("EMAIL_PASSWORD");
     const admin_email = Deno.env.get("ADMIN_EMAIL") || email_user; // Email to receive contact form messages
 
     if (!email_user || !email_password) {
@@ -40,8 +37,8 @@ serve(async (req) => {
     // Setup SMTP client
     const client = new SMTPClient({
       connection: {
-        hostname: "us2.smtp.mailhostbox.com",
-        port: 25,
+        hostname: "smtp.gmail.com",
+        port: 587,
         tls: false,
         auth: {
           username: email_user,

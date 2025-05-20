@@ -19,14 +19,7 @@ const Header = () => {
         </Link>
 
         {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center gap-4">
-          <Button
-            variant="outline"
-            size="lg"
-            asChild
-          >
-            <Link to="/voter-login">Voter Login</Link>
-          </Button>
+        <nav className="hidden md:flex items-center gap-6">
           <Button
             size="lg"
             className="bg-evoting-600 hover:bg-evoting-700 text-white"
@@ -53,15 +46,6 @@ const Header = () => {
                 <Button 
                   variant="outline"
                   className="w-full"
-                  onClick={() => {
-                    navigate("/voter-login");
-                    setIsMenuOpen(false);
-                  }}
-                >
-                  Voter Login
-                </Button>
-                <Button 
-                  className="w-full bg-evoting-600 hover:bg-evoting-700 text-white"
                   onClick={() => {
                     navigate("/login");
                     setIsMenuOpen(false);
