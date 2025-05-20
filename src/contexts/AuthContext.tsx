@@ -232,13 +232,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (otpError) throw otpError;
       
       // Send OTP email
-      const projectResponse = await supabase
+      // FIX: Get project title from the projects table with proper error handling
+      const { data: project, error: projectError } = await supabase
         .from('projects')
-        .select('name')
+        .select('title')
         .eq('id', voter.project_id)
         .single();
       
-      const projectName = projectResponse.data?.name || 'eVoting Meeting';
+      if (projectError) {
+        console.error('Error fetching project:', projectError.message);
+      }
+      
+      const projectName = project?.title || 'eVoting Meeting';
       
       const response = await fetch(`${window.location.origin}/functions/v1/send-voter-otp`, {
         method: 'POST',
