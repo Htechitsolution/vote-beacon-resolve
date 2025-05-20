@@ -41,7 +41,6 @@ function App() {
         {/* Voter routes */}
         <Route path="/voter-login" element={<VoterLoginPage />} />
         <Route path="/voter-dashboard" element={<VoterDashboardPage />} />
-        <Route path="/voter/agenda/:agendaId" element={<VoterDashboardPage />} />
         
         {/* Protected routes */}
         <Route element={<ProtectedRoute />}>

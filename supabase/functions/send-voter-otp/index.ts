@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { SMTPClient } from "https://deno.land/x/smtp@v0.7.0/mod.ts";
 
@@ -6,14 +7,12 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-interface VoterEmailRequest {
+interface VoterOtpRequest {
   email: string;
   name: string;
-  otp?: string; // Keep for backward compatibility
+  otp: string;
   projectName: string;
   votingLink: string;
-  emailSubject?: string;
-  emailBody?: string;
 }
 
 serve(async (req) => {
@@ -23,14 +22,13 @@ serve(async (req) => {
   }
 
   try {
-    const requestData: VoterEmailRequest = await req.json();
-    const { email, name, projectName, votingLink, emailSubject, emailBody } = requestData;
+    const { email, name, otp, projectName, votingLink }: VoterOtpRequest = await req.json();
 
     // Basic validation
-    if (!email) {
+    if (!email || !otp) {
       return new Response(
         JSON.stringify({ 
-          error: "Email is required" 
+          error: "Email and OTP are required" 
         }),
         {
           status: 400,
@@ -38,6 +36,9 @@ serve(async (req) => {
         }
       );
     }
+    
+    // Log OTP for testing purposes
+    console.log(`Sending OTP email to ${email} with code: ${otp}`);
     
     try {
       // Get email credentials from environment variables
@@ -61,39 +62,28 @@ serve(async (req) => {
         },
       });
   
-      // Create HTML email content
-      let htmlBody;
-      
-      // If custom email body is provided, use it
-      if (emailBody) {
-        htmlBody = emailBody;
-      } 
-      // Otherwise, generate a default template (for backward compatibility)
-      else if (requestData.otp) {
-        htmlBody = `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
-            <h2 style="color: #4f46e5;">Your Login Code for ${projectName}</h2>
-            <p>Hello ${name || 'Voter'},</p>
-            <p>Please use the following code to log in to the ${projectName} voting platform:</p>
-            <div style="background-color: #f5f5f5; padding: 15px; text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 5px; border-radius: 4px; margin: 20px 0;">
-              ${requestData.otp}
-            </div>
-            <p>This code will expire in 5 minutes.</p>
-            <p>If you did not request this code, please ignore this email.</p>
-            <p style="margin-top: 30px; font-size: 12px; color: #666;">
-              This is an automated message. Please do not reply to this email.
-            </p>
+      // Create HTML email with OTP
+      const htmlBody = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
+          <h2 style="color: #4f46e5;">Your Login Code for ${projectName}</h2>
+          <p>Hello ${name || 'Voter'},</p>
+          <p>Please use the following code to log in to the ${projectName} voting platform:</p>
+          <div style="background-color: #f5f5f5; padding: 15px; text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 5px; border-radius: 4px; margin: 20px 0;">
+            ${otp}
           </div>
-        `;
-      } else {
-        throw new Error("Either otp or emailBody must be provided");
-      }
+          <p>This code will expire in 5 minutes.</p>
+          <p>If you did not request this code, please ignore this email.</p>
+          <p style="margin-top: 30px; font-size: 12px; color: #666;">
+            This is an automated message. Please do not reply to this email.
+          </p>
+        </div>
+      `;
   
       // Send the email
       await client.send({
         from: `The-eVoting <${email_user}>`,
         to: email,
-        subject: emailSubject || `Your Login Code for ${projectName}`,
+        subject: `Your Login Code for ${projectName}`,
         content: "text/html",
         html: htmlBody,
       });
@@ -103,7 +93,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           success: true,
-          message: "Email sent successfully" 
+          message: "OTP email sent successfully" 
         }),
         {
           status: 200,

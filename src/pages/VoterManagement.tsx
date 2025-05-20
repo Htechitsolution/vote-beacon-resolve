@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import Papa from "papaparse";
+import { sendVoterOTP } from "@/lib/emailUtils";
 
 type Voter = {
   id: string;
@@ -43,7 +44,6 @@ type Voter = {
   voting_weight: number;
   company_name?: string;
   created_at: string;
-  voter_id?: string;
 };
 
 const VoterManagement = () => {
@@ -142,12 +142,6 @@ const VoterManagement = () => {
         return;
       }
 
-      // Generate a 7-digit voter ID
-      const voterId = Math.floor(1000000 + Math.random() * 9000000);
-      
-      // Generate default password
-      const defaultPassword = `Voter@${voterId}`;
-
       // If company name is provided, check if any voter from the same company exists
       // and use their voting weight (do not reduce it)
       let votingWeightToUse = newVoterWeight;
@@ -179,10 +173,7 @@ const VoterManagement = () => {
             name: newVoterName,
             email: newVoterEmail.toLowerCase(),
             company_name: newVoterCompany || null,
-            voting_weight: votingWeightToUse,
-            voter_id: voterId.toString(),
-            password: defaultPassword,
-            force_reset_password: true
+            voting_weight: votingWeightToUse
           },
         ])
         .select();
@@ -203,6 +194,20 @@ const VoterManagement = () => {
       setSelectedVoter(voter);
       setSendingEmail(true);
 
+      // Generate a random 6-digit OTP
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      
+      // Create OTP record in the database
+      const { error: otpError } = await supabase
+        .rpc('create_voter_otp', {
+          v_voter_id: voter.id,
+          v_email: voter.email,
+          v_otp: otp,
+          v_expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString() // 30 minutes expiry
+        });
+      
+      if (otpError) throw otpError;
+      
       // Get project name for email
       const { data: projectData } = await supabase
         .from('projects')
@@ -210,45 +215,24 @@ const VoterManagement = () => {
         .eq('id', projectId)
         .single();
       
-      // Generate email content with login instructions
-      const emailSubject = `Login Details for ${projectData?.title || 'Meeting'}`;
-      const emailBody = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
-          <h2 style="color: #4f46e5;">Your Login Details for ${projectData?.title || 'Meeting'}</h2>
-          <p>Hello ${voter.name || 'Voter'},</p>
-          <p>You have been invited to participate in a voting event. Here are your login details:</p>
-          <div style="background-color: #f5f5f5; padding: 15px; border-radius: 4px; margin: 20px 0;">
-            <p><strong>Email:</strong> ${voter.email}</p>
-            <p><strong>Password:</strong> Voter@${voter.voter_id}</p>
-            <p style="color: #e11d48;"><strong>Important:</strong> You will be required to change your password on first login.</p>
-          </div>
-          <p>To login, visit: <a href="${window.location.origin}/voter-login" style="color: #4f46e5;">${window.location.origin}/voter-login</a></p>
-          <p style="margin-top: 30px; font-size: 12px; color: #666;">
-            This is an automated message. Please do not reply to this email.
-          </p>
-        </div>
-      `;
-      
-      // Send email
+      // Send OTP via email
       const { data, error } = await supabase.functions.invoke('send-voter-otp', {
         body: {
           email: voter.email,
           name: voter.name || 'Voter',
-          otp: `Voter@${voter.voter_id}`, // Not actually used as OTP but needed for API compatibility
+          otp,
           projectName: projectData?.title || 'Meeting',
-          votingLink: `${window.location.origin}/voter-login`,
-          emailSubject: emailSubject,
-          emailBody: emailBody
+          votingLink: `${window.location.origin}/projects/${projectId}/voter-login`
         }
       });
       
       if (error) throw error;
       
-      toast.success(`Login details sent to ${voter.email}`);
+      toast.success(`Login link sent to ${voter.email}`);
       
     } catch (error: any) {
-      console.error('Error sending login details:', error);
-      toast.error(`Failed to send login details: ${error.message}`);
+      console.error('Error sending login link:', error);
+      toast.error(`Failed to send login link: ${error.message}`);
     } finally {
       setSendingEmail(false);
     }
@@ -353,12 +337,6 @@ const VoterManagement = () => {
           continue;
         }
         
-        // Generate a 7-digit voter ID
-        const voterId = Math.floor(1000000 + Math.random() * 9000000);
-        
-        // Generate default password
-        const defaultPassword = `Voter@${voterId}`;
-        
         // Add new voter
         const { error } = await supabase
           .from('voters')
@@ -367,10 +345,7 @@ const VoterManagement = () => {
             name: row.name,
             email: row.email.toLowerCase(),
             company_name: row.company || null,
-            voting_weight: parseFloat(row.weight) || 1,
-            voter_id: voterId.toString(),
-            password: defaultPassword,
-            force_reset_password: true
+            voting_weight: parseFloat(row.weight) || 1
           }]);
           
         if (error) {
