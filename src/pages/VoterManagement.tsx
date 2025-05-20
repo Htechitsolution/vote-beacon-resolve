@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,11 +39,14 @@ import { sendVoterOTP, sendEmail, createEmailTemplate } from "@/lib/emailUtils";
 type Voter = {
   id: string;
   project_id: string;
+  agenda_id: string | null;
   name: string;
   email: string;
   voting_weight: number;
   company_name?: string;
   created_at: string;
+  password?: string;
+  force_reset_password?: boolean;
 };
 
 const VoterManagement = () => {
@@ -166,20 +168,24 @@ const VoterManagement = () => {
       const cleanEmail = newVoterEmail.toLowerCase();
       
       // Check if the email already exists for this specific agenda or project
-      const { data: existingVoter, error: existingVoterError } = await supabase
+      let query = supabase
         .from('voters')
         .select('*')
         .eq('project_id', projectId)
         .eq('email', cleanEmail);
         
+      // For agenda-specific voters, only check for duplicates in the same agenda
+      if (agendaId) {
+        query = query.eq('agenda_id', agendaId);
+      } else {
+        query = query.is('agenda_id', null);
+      }
+      
+      const { data: existingVoter, error: existingVoterError } = await query;
+        
       if (existingVoterError) throw existingVoterError;
 
-      // For agenda-specific voters, only check for duplicates in the same agenda
-      const isDuplicate = agendaId 
-        ? existingVoter?.some(voter => voter.agenda_id === agendaId)
-        : existingVoter?.some(voter => voter.agenda_id === null);
-        
-      if (isDuplicate) {
+      if (existingVoter && existingVoter.length > 0) {
         toast.error("This email is already registered for this " + (agendaId ? "meeting" : "project"));
         return;
       }
@@ -424,16 +430,16 @@ const VoterManagement = () => {
         }
         
         // Check if voter exists
-        const query = supabase
+        let query = supabase
           .from('voters')
           .select('id')
           .eq('project_id', projectId)
           .eq('email', row.email.toLowerCase());
           
         if (agendaId) {
-          query.eq('agenda_id', agendaId);
+          query = query.eq('agenda_id', agendaId);
         } else {
-          query.is('agenda_id', null);
+          query = query.is('agenda_id', null);
         }
         
         const { data: existingVoter } = await query;
