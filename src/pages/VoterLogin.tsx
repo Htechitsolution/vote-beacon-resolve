@@ -1,165 +1,138 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Vote as VoteIcon } from "lucide-react";
+import { Vote as VoteIcon, EyeOff, Eye } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import Footer from "@/components/layout/Footer";
-import { sendVoterOTP } from "@/lib/emailService";
-import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 
 const VoterLogin = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
-  const [otp, setOtp] = useState("");
-  const [isGeneratingOtp, setIsGeneratingOtp] = useState(false);
-  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
-  const [showOtpField, setShowOtpField] = useState(false);
-  const [voterId, setVoterId] = useState<string | null>(null);
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [shouldResetPassword, setShouldResetPassword] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  const handleGenerateOtp = async (e: React.FormEvent) => {
+  useEffect(() => {
+    // Check if voter is already logged in
+    const voterSession = localStorage.getItem('voterSession');
+    if (voterSession) {
+      navigate('/voter-dashboard');
+    }
+  }, [navigate]);
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!email) {
-      toast.error("Please enter your email address");
+    if (!email || !password) {
+      toast.error("Please enter both email and password");
       return;
     }
     
     try {
-      setIsGeneratingOtp(true);
+      setIsLoading(true);
       
-      // Check if voter exists using select syntax compatible with Supabase
+      // Check if voter exists
       const { data: voterData, error: voterError } = await supabase
         .from('voters')
-        .select('id, name')
+        .select('id, name, password, force_reset_password')
         .eq('email', email.toLowerCase())
         .maybeSingle();
       
       if (voterError) {
-        console.error("Error fetching voter:", voterError);
-        toast.error("Error checking voter: " + voterError.message);
+        console.error("Error checking voter:", voterError);
+        toast.error("An error occurred while checking voter credentials");
         return;
       }
       
       if (!voterData) {
-        toast.error("No voter account found with this email");
+        toast.error("Invalid email or password");
         return;
       }
       
-      // Generate a random 6-digit OTP
-      const randomOtp = Math.floor(100000 + Math.random() * 900000).toString();
-      setVoterId(voterData.id);
-      
-      // Log OTP to console for testing
-      console.log("Generated OTP for testing:", randomOtp);
-      
-      // Store OTP in database with 5-minute expiration
-      const expirationTime = new Date();
-      expirationTime.setMinutes(expirationTime.getMinutes() + 5);
-      
-      const { data: functionData, error: functionError } = await supabase.rpc(
-        'create_voter_otp',
-        {
-          v_voter_id: voterData.id,
-          v_email: email.toLowerCase(),
-          v_otp: randomOtp,
-          v_expires_at: expirationTime.toISOString()
-        }
-      );
-      
-      if (functionError) {
-        console.error("Error storing OTP:", functionError);
-        toast.error("Failed to generate OTP: " + functionError.message);
-        // Even if there's an error storing OTP, we'll still show the OTP field for testing
+      // Basic password verification - in a real app, you'd use bcrypt or similar
+      if (voterData.password !== password) {
+        toast.error("Invalid email or password");
+        return;
       }
       
-      // Try to send OTP via email, but continue even if it fails
-      try {
-        const { success, message } = await sendVoterOTP(
-          email,
-          voterData.name || 'Voter',
-          randomOtp,
-          "The-eVoting",
-          window.location.origin
-        );
-        
-        if (!success) {
-          console.warn("Email sending failed:", message);
-          toast.warning("Failed to send OTP email, but you can use the OTP displayed in the console for testing");
-        } else {
-          toast.success("OTP has been sent to your email");
-        }
-      } catch (emailError) {
-        console.error("Error sending email:", emailError);
-        toast.warning("Failed to send OTP email, but you can use the OTP displayed in the console for testing");
+      // If force password reset is required
+      if (voterData.force_reset_password) {
+        setCurrentUserId(voterData.id);
+        setShouldResetPassword(true);
+        return;
       }
       
-      // Show OTP input field and auto-fill it for testing regardless of email success
-      setShowOtpField(true);
-      setOtp(randomOtp); // Pre-fill the OTP for testing purposes
+      // Login successful, create session
+      localStorage.setItem('voterSession', JSON.stringify({
+        voterId: voterData.id,
+        email,
+        loggedInAt: new Date().toISOString(),
+        name: voterData.name
+      }));
+      
+      toast.success("Logged in successfully");
+      navigate('/voter-dashboard');
       
     } catch (error: any) {
-      console.error("Error generating OTP:", error);
-      toast.error(error.message || "Failed to generate OTP");
+      console.error("Login error:", error);
+      toast.error(error.message || "Failed to login");
     } finally {
-      setIsGeneratingOtp(false);
+      setIsLoading(false);
     }
   };
 
-  const handleVerifyOtp = async (e: React.FormEvent) => {
+  const handlePasswordReset = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!otp) {
-      toast.error("Please enter the OTP");
+    if (newPassword !== confirmPassword) {
+      toast.error("Passwords do not match");
       return;
     }
     
-    if (!voterId) {
-      toast.error("Session expired, please try again");
-      setShowOtpField(false);
+    if (newPassword.length < 8) {
+      toast.error("Password must be at least 8 characters long");
       return;
     }
     
     try {
-      setIsVerifyingOtp(true);
+      setIsLoading(true);
       
-      // Verify OTP using database function
-      const { data: isValid, error: verifyError } = await supabase.rpc(
-        'verify_voter_otp',
-        {
-          v_voter_id: voterId,
-          v_otp: otp
-        }
-      );
+      // Update password in the database
+      const { error } = await supabase
+        .from('voters')
+        .update({ 
+          password: newPassword,
+          force_reset_password: false
+        })
+        .eq('id', currentUserId);
       
-      if (verifyError) {
-        console.error("Error verifying OTP:", verifyError);
-        toast.error("Failed to verify OTP: " + verifyError.message);
-        return;
+      if (error) {
+        throw error;
       }
       
-      if (isValid) {
-        // Store voter session in local storage
-        localStorage.setItem('voterSession', JSON.stringify({
-          voterId,
-          email,
-          loggedInAt: new Date().toISOString()
-        }));
-        
-        toast.success("Login successful");
-        navigate('/voter-dashboard');
-      } else {
-        toast.error("Invalid or expired OTP. Please try again");
-      }
+      // Create session
+      localStorage.setItem('voterSession', JSON.stringify({
+        voterId: currentUserId,
+        email,
+        loggedInAt: new Date().toISOString()
+      }));
+      
+      toast.success("Password updated successfully");
+      navigate('/voter-dashboard');
       
     } catch (error: any) {
-      console.error("Error verifying OTP:", error);
-      toast.error(error.message || "Failed to verify OTP");
+      console.error("Password reset error:", error);
+      toast.error(error.message || "Failed to update password");
     } finally {
-      setIsVerifyingOtp(false);
+      setIsLoading(false);
     }
   };
 
@@ -179,90 +152,119 @@ const VoterLogin = () => {
       
       <main className="flex-grow flex items-center justify-center py-12">
         <div className="w-full max-w-md p-6 md:p-8 bg-white rounded-lg shadow-lg border border-gray-200">
-          <div className="text-center mb-8">
-            <h1 className="text-2xl font-bold mb-2">Voter Login</h1>
-            <p className="text-gray-600">Enter your email to receive a login code</p>
-          </div>
-          
-          {!showOtpField ? (
-            <form onSubmit={handleGenerateOtp} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email Address</Label>
-                <Input 
-                  id="email"
-                  type="email"
-                  placeholder="name@company.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
+          {!shouldResetPassword ? (
+            <>
+              <div className="text-center mb-8">
+                <h1 className="text-2xl font-bold mb-2">Voter Login</h1>
+                <p className="text-gray-600">Enter your email and password to access your voting portal</p>
               </div>
               
-              <Button 
-                type="submit"
-                className="w-full bg-evoting-600 hover:bg-evoting-700 text-white"
-                disabled={isGeneratingOtp}
-              >
-                {isGeneratingOtp ? "Generating OTP..." : "Generate OTP"}
-              </Button>
-              
-              <div className="text-center mt-4">
-                <p className="text-gray-600">
-                  Are you an admin?{" "}
-                  <Link to="/login" className="text-evoting-600 hover:underline">
-                    Login here
-                  </Link>
-                </p>
-                
-                <Link to="/" className="text-sm text-evoting-600 hover:underline block mt-2">
-                  Return to home page
-                </Link>
-              </div>
-            </form>
-          ) : (
-            <form onSubmit={handleVerifyOtp} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="otp">Enter OTP (Pre-filled for testing)</Label>
-                <div className="flex flex-col items-center gap-4">
-                  <InputOTP 
-                    value={otp}
-                    onChange={(value) => setOtp(value)}
-                    maxLength={6}
-                    render={({ slots }) => (
-                      <InputOTPGroup>
-                        {slots.map((slot, index) => (
-                          <InputOTPSlot key={index} {...slot} index={index} />
-                        ))}
-                      </InputOTPGroup>
-                    )}
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email Address</Label>
+                  <Input 
+                    id="email"
+                    type="email"
+                    placeholder="name@company.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
                   />
-                  <p className="text-xs text-gray-500">
-                    For testing purposes, the OTP has been pre-filled in the input boxes above
-                  </p>
                 </div>
-              </div>
-              
-              <Button 
-                type="submit"
-                className="w-full bg-evoting-600 hover:bg-evoting-700 text-white"
-                disabled={isVerifyingOtp}
-              >
-                {isVerifyingOtp ? "Verifying..." : "Login"}
-              </Button>
-              
-              <div className="text-center">
-                <button
-                  type="button"
-                  className="text-sm text-evoting-600 hover:underline"
-                  onClick={() => {
-                    setShowOtpField(false);
-                    setOtp("");
-                  }}
+                
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <div className="relative">
+                    <Input 
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Enter your password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500"
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                </div>
+                
+                <Button 
+                  type="submit"
+                  className="w-full bg-evoting-600 hover:bg-evoting-700 text-white"
+                  disabled={isLoading}
                 >
-                  Use a different email
-                </button>
+                  {isLoading ? "Logging in..." : "Login"}
+                </Button>
+                
+                <div className="text-center mt-4">
+                  <p className="text-gray-600">
+                    Are you an admin?{" "}
+                    <Link to="/login" className="text-evoting-600 hover:underline">
+                      Login here
+                    </Link>
+                  </p>
+                  
+                  <Link to="/" className="text-sm text-evoting-600 hover:underline block mt-2">
+                    Return to home page
+                  </Link>
+                </div>
+              </form>
+            </>
+          ) : (
+            <>
+              <div className="text-center mb-8">
+                <h1 className="text-2xl font-bold mb-2">Change Your Password</h1>
+                <p className="text-gray-600">Please create a new password for your account</p>
               </div>
-            </form>
+              
+              <form onSubmit={handlePasswordReset} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="new-password">New Password</Label>
+                  <div className="relative">
+                    <Input 
+                      id="new-password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Enter new password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500"
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="confirm-password">Confirm New Password</Label>
+                  <Input 
+                    id="confirm-password"
+                    type="password"
+                    placeholder="Confirm new password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                  />
+                </div>
+                
+                <Button 
+                  type="submit"
+                  className="w-full bg-evoting-600 hover:bg-evoting-700 text-white"
+                  disabled={isLoading}
+                >
+                  {isLoading ? "Updating..." : "Update Password"}
+                </Button>
+              </form>
+            </>
           )}
         </div>
       </main>
