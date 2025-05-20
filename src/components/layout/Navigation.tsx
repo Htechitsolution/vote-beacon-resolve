@@ -1,198 +1,272 @@
-
-import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import React, { useState, useRef, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
-import { Menu, X, LogOut, User, LayoutDashboard, IndianRupee, FolderOpen } from "lucide-react";
-import { toast } from "@/components/ui/use-toast";
-import { Vote as VoteIcon } from "lucide-react";
-
-interface NavLink {
-  label: string;
-  href: string;
-  icon: React.ElementType;
-}
+import { Vote as VoteIcon, User, ChevronDown, Menu, X } from "lucide-react";
+import { useMobile } from "@/hooks/useMobile";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 const Navigation = () => {
+  const { user, profile, signOut } = useAuth();
   const navigate = useNavigate();
-  const { user, profile } = useAuth();
+  const { isMobile } = useMobile();
   const [isOpen, setIsOpen] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+  const userButtonRef = useRef<HTMLButtonElement>(null);
 
-  const toggleMenu = () => {
-    setIsOpen(!isOpen);
-  };
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node) &&
+        userButtonRef.current && !userButtonRef.current.contains(event.target as Node)
+      ) {
+        setShowUserMenu(false);
+      }
+    };
 
-  const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-      navigate('/login');
-      toast({
-        title: "Success",
-        description: "Logged out successfully"
-      });
-    } catch (error: any) {
-      console.error('Logout error:', error);
-      toast({
-        title: "Error",
-        description: "Failed to log out",
-        variant: "destructive"
-      });
+    if (showUserMenu) {
+      document.addEventListener("mousedown", handleClickOutside);
+    } else {
+      document.removeEventListener("mousedown", handleClickOutside);
     }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showUserMenu]);
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/login');
   };
-  
-  const navLinks: NavLink[] = [];
-
-  // Add Projects link for all logged-in users
-  if (user) {
-    navLinks.push({
-      label: "Projects",
-      href: "/projects",
-      icon: FolderOpen
-    });
-  }
-
-  // Add Admin Dashboard link for super admins
-  if (profile?.role === "super_admin") {
-    navLinks.unshift({
-      label: "Admin Dashboard",
-      href: "/admin-dashboard",
-      icon: LayoutDashboard
-    });
-  }
-
-  const isAdmin = profile?.role === "admin" || profile?.role === "super_admin";
 
   return (
-    <header className="bg-white border-b">
-      <div className="container mx-auto px-4 flex justify-between items-center h-16">
-        <div className="flex items-center gap-2">
+    <nav className="sticky top-0 w-full bg-white/90 backdrop-blur-sm border-b border-gray-200 z-50 shadow-sm">
+      <div className="container mx-auto px-4 flex items-center justify-between h-16">
+        {/* Logo */}
+        <div className="flex items-center">
+          {/* Mobile menu button */}
+          {isMobile && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="mr-2"
+              onClick={() => setIsOpen(!isOpen)}
+            >
+              {isOpen ? (
+                <X className="h-6 w-6" />
+              ) : (
+                <Menu className="h-6 w-6" />
+              )}
+              <span className="sr-only">Toggle menu</span>
+            </Button>
+          )}
+
           <Link to="/" className="flex items-center gap-2">
-          <VoteIcon className="text-evoting-600 h-19 w-19" />
-            <span className="text-xl font-bold">The-eVoting</span>
+            <VoteIcon className="text-evoting-600 h-19 w-19" />
+            <span className="text-lg md:text-xl font-bold text-evoting-800">
+              The-eVoting
+            </span>
           </Link>
         </div>
-        <div className="hidden md:flex items-center space-x-4">
+
+        {/* Desktop navigation */}
+        {!isMobile && (
+          <div className="flex items-center gap-6">
+            <Link
+              to="/"
+              className="text-gray-700 hover:text-evoting-600 transition-colors"
+            >
+              Home
+            </Link>
+            {user && (
+              <>
+                <Link
+                  to="/projects"
+                  className="text-gray-700 hover:text-evoting-600 transition-colors"
+                >
+                  Projects
+                </Link>
+                {profile?.role === 'super_admin' && (
+                  <>
+                    <Link
+                      to="/admin-dashboard"
+                      className="text-gray-700 hover:text-evoting-600 transition-colors"
+                    >
+                      Admin Dashboard
+                    </Link>
+                    <Link
+                      to="/voter-meetings"
+                      className="text-gray-700 hover:text-evoting-600 transition-colors"
+                    >
+                      Voter Meetings
+                    </Link>
+                  </>
+                )}
+              </>
+            )}
+            <Link
+              to="/contact-us"
+              className="text-gray-700 hover:text-evoting-600 transition-colors"
+            >
+              Contact
+            </Link>
+          </div>
+        )}
+
+        {/* User menu or login button */}
+        <div className="flex items-center gap-2">
           {user ? (
-            <>
-              {navLinks.map((link, index) => (
-                <Button key={index} asChild variant="ghost">
-                  <Link to={link.href} className="flex items-center gap-2">
-                    <link.icon className="mr-1 h-4 w-4" />
-                    {link.label}
-                  </Link>
-                </Button>
-              ))}
-              {isAdmin && (
-                <Button asChild variant="ghost">
-                  <Link to="/profile" className="flex items-center gap-2">
-                    <User className="mr-1 h-4 w-4" />
-                    Profile
-                  </Link>
-                </Button>
-              )}
-              <Button 
-                variant="outline"
-                onClick={() => navigate('/checkout')}
-                className="flex items-center gap-2 border-amber-500 text-amber-700 hover:bg-amber-50"
+            <div className="relative" ref={userMenuRef}>
+              <Button
+                ref={userButtonRef}
+                variant="ghost"
+                className="flex items-center gap-2"
+                onClick={() => setShowUserMenu(!showUserMenu)}
               >
-                <IndianRupee className="mr-1 h-4 w-4" />
-                Buy Credits
+                <User className="h-5 w-5" />
+                <span className="hidden md:block">
+                  {profile?.name || user.email}
+                </span>
+                <ChevronDown className="h-4 w-4" />
               </Button>
-              <Button variant="outline" onClick={handleLogout} className="flex items-center gap-2">
-                <LogOut className="mr-1 h-4 w-4" />
-                Logout
-              </Button>
-            </>
+
+              {showUserMenu && (
+                <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5">
+                  <div
+                    className="py-1"
+                    role="menu"
+                    aria-orientation="vertical"
+                    aria-labelledby="user-menu"
+                  >
+                    <div className="px-4 py-2 text-xs text-gray-500 border-b">
+                      {user.email}
+                    </div>
+                    <Link
+                      to="/profile"
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      role="menuitem"
+                      onClick={() => setShowUserMenu(false)}
+                    >
+                      Your Profile
+                    </Link>
+                    <Link
+                      to="/projects"
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      role="menuitem"
+                      onClick={() => setShowUserMenu(false)}
+                    >
+                      Your Projects
+                    </Link>
+                    {profile?.role === 'super_admin' && (
+                      <>
+                        <Link
+                          to="/admin-dashboard"
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          role="menuitem"
+                          onClick={() => setShowUserMenu(false)}
+                        >
+                          Admin Dashboard
+                        </Link>
+                        <Link
+                          to="/voter-meetings"
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          role="menuitem"
+                          onClick={() => setShowUserMenu(false)}
+                        >
+                          Voter Meetings
+                        </Link>
+                      </>
+                    )}
+                    <button
+                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      role="menuitem"
+                      onClick={handleSignOut}
+                    >
+                      Sign out
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           ) : (
-            <>
-              <Button asChild variant="outline">
-                <Link to="/login">Admin Login</Link>
-              </Button>
-            </>
+            <Button
+              onClick={() => navigate("/login")}
+              className="bg-evoting-600 hover:bg-evoting-700 text-white"
+            >
+              Sign in
+            </Button>
           )}
         </div>
-        <div className="md:hidden">
-          <Button variant="ghost" size="icon" onClick={toggleMenu}>
-            {isOpen ? (
-              <X className="h-6 w-6" />
-            ) : (
-              <Menu className="h-6 w-6" />
-            )}
-          </Button>
-        </div>
       </div>
-      {isOpen && (
-        <div className="md:hidden p-4 border-t bg-white">
-          <div className="flex flex-col space-y-3">
-            {user ? (
+
+      {/* Mobile menu drawer */}
+      {isMobile && isOpen && (
+        <div className="border-b">
+          <div className="container mx-auto px-4 py-4 flex flex-col gap-4">
+            <Link
+              to="/"
+              className="text-gray-700 hover:text-evoting-600 transition-colors block"
+            >
+              Home
+            </Link>
+            {user && (
               <>
-                {navLinks.map((link, index) => (
-                  <Button
-                    key={index}
-                    asChild
-                    variant="ghost"
-                    className="justify-start"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    <Link to={link.href}>
-                      <link.icon className="mr-2 h-4 w-4" />
-                      {link.label}
-                    </Link>
-                  </Button>
-                ))}
-                {isAdmin && (
-                  <Button
-                    asChild
-                    variant="ghost"
-                    className="justify-start"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    <Link to="/profile">
-                      <User className="mr-2 h-4 w-4" />
-                      Profile
-                    </Link>
-                  </Button>
-                )}
-                <Button
-                  variant="ghost"
-                  className="justify-start"
-                  onClick={() => {
-                    navigate('/checkout');
-                    setIsOpen(false);
-                  }}
+                <Link
+                  to="/projects"
+                  className="text-gray-700 hover:text-evoting-600 transition-colors block"
                 >
-                  <IndianRupee className="mr-2 h-4 w-4" />
-                  Buy Credits
-                </Button>
+                  Projects
+                </Link>
+                {profile?.role === 'super_admin' && (
+                  <>
+                    <Link
+                      to="/admin-dashboard"
+                      className="text-gray-700 hover:text-evoting-600 transition-colors block"
+                    >
+                      Admin Dashboard
+                    </Link>
+                    <Link
+                      to="/voter-meetings"
+                      className="text-gray-700 hover:text-evoting-600 transition-colors block"
+                    >
+                      Voter Meetings
+                    </Link>
+                  </>
+                )}
+                <Link
+                  to="/profile"
+                  className="text-gray-700 hover:text-evoting-600 transition-colors block"
+                >
+                  Profile
+                </Link>
                 <Button
                   variant="outline"
-                  className="justify-start"
-                  onClick={() => {
-                    handleLogout();
-                    setIsOpen(false);
-                  }}
+                  className="w-full justify-start"
+                  onClick={handleSignOut}
                 >
-                  <LogOut className="mr-2 h-4 w-4" />
-                  Logout
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button
-                  asChild
-                  variant="ghost"
-                  className="justify-start"
-                  onClick={() => setIsOpen(false)}
-                >
-                  <Link to="/login">Admin Login</Link>
+                  Sign Out
                 </Button>
               </>
             )}
+            <Link
+              to="/contact-us"
+              className="text-gray-700 hover:text-evoting-600 transition-colors block"
+            >
+              Contact
+            </Link>
           </div>
         </div>
       )}
-    </header>
+    </nav>
   );
 };
 

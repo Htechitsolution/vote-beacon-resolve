@@ -21,6 +21,7 @@ import VoterManagementPage from './pages/VoterManagement';
 import CheckoutPage from './pages/Checkout';
 import VoterLoginPage from './pages/VoterLogin';
 import VoterDashboardPage from './pages/VoterDashboard';
+import VoterMeetingListPage from './pages/VoterMeetingList';
 import ProtectedRoute from './components/ProtectedRoute';
 import SuperAdminRoute from './components/SuperAdminRoute';
 
@@ -54,6 +55,7 @@ function App() {
         {/* Super admin routes */}
         <Route element={<SuperAdminRoute />}>
           <Route path="/admin-dashboard" element={<AdminDashboardPage />} />
+          <Route path="/voter-meetings" element={<VoterMeetingListPage />} />
         </Route>
         
         <Route path="*" element={<NotFoundPage />} />

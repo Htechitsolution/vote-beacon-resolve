@@ -73,27 +73,33 @@ const VoterLogin = () => {
       if (functionError) {
         console.error("Error storing OTP:", functionError);
         toast.error("Failed to generate OTP: " + functionError.message);
-        return;
+        // Even if there's an error storing OTP, we'll still show the OTP field for testing
       }
       
-      // Send OTP via email
-      const { success, message } = await sendVoterOTP(
-        email,
-        voterData.name || 'Voter',
-        randomOtp,
-        "The-eVoting",
-        window.location.origin
-      );
-      
-      if (!success) {
-        toast.error(message || "Failed to send OTP");
-        return;
+      // Try to send OTP via email, but continue even if it fails
+      try {
+        const { success, message } = await sendVoterOTP(
+          email,
+          voterData.name || 'Voter',
+          randomOtp,
+          "The-eVoting",
+          window.location.origin
+        );
+        
+        if (!success) {
+          console.warn("Email sending failed:", message);
+          toast.warning("Failed to send OTP email, but you can use the OTP displayed in the console for testing");
+        } else {
+          toast.success("OTP has been sent to your email");
+        }
+      } catch (emailError) {
+        console.error("Error sending email:", emailError);
+        toast.warning("Failed to send OTP email, but you can use the OTP displayed in the console for testing");
       }
       
-      // Show OTP input field and auto-fill it for testing
+      // Show OTP input field and auto-fill it for testing regardless of email success
       setShowOtpField(true);
       setOtp(randomOtp); // Pre-fill the OTP for testing purposes
-      toast.success("OTP has been sent to your email and pre-filled for testing");
       
     } catch (error: any) {
       console.error("Error generating OTP:", error);
