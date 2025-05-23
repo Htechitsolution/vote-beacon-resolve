@@ -78,7 +78,7 @@ const VoterVerify = () => {
           <h2 className="text-center text-2xl font-bold text-gray-900 mb-4">Verify Your Identity</h2>
           {pendingVoterEmail && (
             <p className="text-center text-gray-600 mb-6">
-              Enter the 6-digit code sent to <strong>{pendingVoterEmail}</strong>
+              Enter the 6-digit code for <strong>{pendingVoterEmail}</strong>
             </p>
           )}
           
@@ -116,6 +116,10 @@ const VoterVerify = () => {
               >
                 Back to Login
               </Button>
+            </div>
+            
+            <div className="text-center text-sm text-gray-500 mt-4">
+              <p>Testing mode: Check the console for the OTP</p>
             </div>
           </form>
         </div>

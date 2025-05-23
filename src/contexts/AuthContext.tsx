@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Session, User } from '@supabase/supabase-js';
@@ -201,7 +200,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Voter OTP login methods
+  // Modified Voter OTP login methods
   const initiateVoterLogin = async (email: string) => {
     try {
       setIsLoading(true);
@@ -231,40 +230,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (otpError) throw otpError;
       
-      // Send OTP email
-      // FIX: Get project title from the projects table with proper error handling
-      const { data: project, error: projectError } = await supabase
-        .from('projects')
-        .select('title')
-        .eq('id', voter.project_id)
-        .single();
+      // REMOVED: Email sending functionality
+      // Instead, log the OTP to console for testing
+      console.log('========== VOTER LOGIN OTP ==========');
+      console.log(`Email: ${email.toLowerCase()}`);
+      console.log(`OTP: ${otp}`);
+      console.log('====================================');
       
-      if (projectError) {
-        console.error('Error fetching project:', projectError.message);
-      }
-      
-      const projectName = project?.title || 'eVoting Meeting';
-      
-      const response = await fetch(`${window.location.origin}/functions/v1/send-voter-otp`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: email.toLowerCase(),
-          name: voter.name || 'Voter',
-          otp: otp,
-          projectName: projectName,
-          votingLink: `${window.location.origin}/voter-verify`
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to send OTP email');
-      }
-
-      console.log('OTP sent to voter:', otp); // For development purposes
+      // Still return success since we're just bypassing the email for testing
+      return;
       
     } catch (error: any) {
       console.error('Error initiating voter login:', error);

@@ -47,14 +47,14 @@ const VoterLogin = () => {
       await initiateVoterLogin(email);
       
       setShowSuccess(true);
-      toast.success("OTP sent successfully!");
+      toast.success("OTP generated successfully! Check the browser console.");
       setTimeout(() => {
         navigate('/voter-verify');
       }, 1500);
     } catch (err: any) {
       console.error(err);
-      toast.error(err.message || "Failed to send OTP");
-      setError("Failed to send OTP. Please try again.");
+      toast.error(err.message || "Failed to generate OTP");
+      setError("Failed to generate OTP. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -78,7 +78,7 @@ const VoterLogin = () => {
           {showSuccess ? (
             <div className="bg-green-50 p-4 rounded-md mb-4 text-center border border-green-100">
               <p className="text-green-800">
-                OTP sent successfully! Redirecting...
+                OTP generated successfully! Check the browser console.
               </p>
             </div>
           ) : (
@@ -102,8 +102,12 @@ const VoterLogin = () => {
                 className="w-full bg-evoting-600 hover:bg-evoting-700 text-white"
                 disabled={loading}
               >
-                {loading ? "Sending..." : "Send OTP"}
+                {loading ? "Generating..." : "Get OTP"}
               </Button>
+              
+              <div className="text-center text-sm text-gray-500 mt-4">
+                <p>Testing mode: OTP will be displayed in browser console</p>
+              </div>
             </form>
           )}
           
