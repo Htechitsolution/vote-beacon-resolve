@@ -15,7 +15,6 @@ const VoterLogin = () => {
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
   const navigate = useNavigate();
   const { initiateVoterLogin, user } = useAuth();
   
@@ -43,14 +42,12 @@ const VoterLogin = () => {
     setLoading(true);
     
     try {
-      // Generate and send OTP
+      // Generate and "display" OTP in console
       await initiateVoterLogin(email);
       
-      setShowSuccess(true);
       toast.success("OTP generated successfully! Check the browser console.");
-      setTimeout(() => {
-        navigate('/voter-verify');
-      }, 1500);
+      // Navigate immediately to verification page
+      navigate('/voter-verify');
     } catch (err: any) {
       console.error(err);
       toast.error(err.message || "Failed to generate OTP");
@@ -75,41 +72,33 @@ const VoterLogin = () => {
             Enter your email to receive a one-time password
           </p>
           
-          {showSuccess ? (
-            <div className="bg-green-50 p-4 rounded-md mb-4 text-center border border-green-100">
-              <p className="text-green-800">
-                OTP generated successfully! Check the browser console.
-              </p>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email Address</Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                required
+                autoFocus
+              />
+              {error && <p className="text-sm text-red-500">{error}</p>}
             </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email Address</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  required
-                  autoFocus
-                />
-                {error && <p className="text-sm text-red-500">{error}</p>}
-              </div>
-              
-              <Button 
-                type="submit"
-                className="w-full bg-evoting-600 hover:bg-evoting-700 text-white"
-                disabled={loading}
-              >
-                {loading ? "Generating..." : "Get OTP"}
-              </Button>
-              
-              <div className="text-center text-sm text-gray-500 mt-4">
-                <p>Testing mode: OTP will be displayed in browser console</p>
-              </div>
-            </form>
-          )}
+            
+            <Button 
+              type="submit"
+              className="w-full bg-evoting-600 hover:bg-evoting-700 text-white"
+              disabled={loading}
+            >
+              {loading ? "Generating..." : "Get OTP"}
+            </Button>
+            
+            <div className="text-center text-sm text-gray-500 mt-4">
+              <p>Testing mode: OTP will be displayed in browser console</p>
+            </div>
+          </form>
           
           <div className="mt-6 text-center">
             <p className="text-gray-600">

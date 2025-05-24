@@ -200,44 +200,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Modified Voter OTP login methods
+  // Simplified Voter OTP login methods for testing
   const initiateVoterLogin = async (email: string) => {
     try {
       setIsLoading(true);
-      // First check if this voter exists
-      const { data: voter, error: voterError } = await supabase
-        .from('voters')
-        .select('*')
-        .eq('email', email.toLowerCase())
-        .single();
       
-      if (voterError || !voter) {
-        throw new Error('No voter found with this email address');
-      }
-      
-      // Generate OTP
+      // For testing purposes, allow any email and generate OTP
       const otp = generateOTP();
       setPendingVoterEmail(email);
       setPendingVoterOTP(otp);
       
-      // Store OTP in database
-      const { error: otpError } = await supabase.rpc('create_voter_otp', {
-        v_voter_id: voter.id,
-        v_email: email.toLowerCase(),
-        v_otp: otp,
-        v_expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString() // 30 minutes expiry
-      });
-      
-      if (otpError) throw otpError;
-      
-      // REMOVED: Email sending functionality
-      // Instead, log the OTP to console for testing
+      // Log the OTP to console for testing
       console.log('========== VOTER LOGIN OTP ==========');
       console.log(`Email: ${email.toLowerCase()}`);
       console.log(`OTP: ${otp}`);
       console.log('====================================');
       
-      // Still return success since we're just bypassing the email for testing
+      // Simulate async operation
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       return;
       
     } catch (error: any) {
@@ -256,44 +237,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setIsLoading(true);
       
-      // Find voter
-      const { data: voter, error: voterError } = await supabase
-        .from('voters')
-        .select('*')
-        .eq('email', pendingVoterEmail.toLowerCase())
-        .single();
-      
-      if (voterError || !voter) {
-        throw new Error('Voter not found');
-      }
-      
-      // For development - allow direct match with stored OTP
+      // For testing - allow direct match with stored OTP
       if (enteredOTP === pendingVoterOTP) {
-        // Create session for voter
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email: pendingVoterEmail,
-          password: enteredOTP
-        });
-        
-        if (signInError) {
-          // If error (likely because no user exists with this email), try to verify via database function
-          const { data: isValid, error: verifyError } = await supabase.rpc('verify_voter_otp', {
-            v_voter_id: voter.id,
-            v_otp: enteredOTP
-          });
-          
-          if (verifyError || !isValid) {
-            throw new Error('Invalid OTP');
-          }
-          
-          // OTP is valid, create a session manually
-          // For now, we'll just return true and handle this on the frontend
-          setPendingVoterEmail(null);
-          setPendingVoterOTP(null);
-          return true;
-        }
-        
-        // SignIn worked - we have a session now
+        // Clear pending data
         setPendingVoterEmail(null);
         setPendingVoterOTP(null);
         return true;
