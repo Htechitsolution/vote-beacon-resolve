@@ -24,11 +24,8 @@ serve(async (req) => {
   }
 
   try {
-    const email_user = "htech.walit@gmail.com";
-    const email_password = "eujzcagbfcxagsvj";
-
-    //const email_user = "Deno.env.get("EMAIL_USER")";
-    //const email_password = Deno.env.get("EMAIL_PASSWORD");
+    const email_user = "Deno.env.get("EMAIL_USER")";
+    const email_password = Deno.env.get("EMAIL_PASSWORD");
     
     if (!email_user || !email_password) {
       console.error("Missing email credentials", { user: email_user ? "set" : "missing", password: email_password ? "set" : "missing" });
