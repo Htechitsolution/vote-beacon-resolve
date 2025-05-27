@@ -8,11 +8,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
 import { sendEmail } from '@/lib/emailUtils';
 import { toast } from 'sonner';
-import { Mail, Send, Settings } from 'lucide-react';
+import { Mail, Send, Settings, AlertTriangle } from 'lucide-react';
 
 const EmailTest = () => {
   const { user, profile } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [lastError, setLastError] = useState<string | null>(null);
   const [testEmail, setTestEmail] = useState({
     to: '',
     subject: 'Test Email from The-eVoting System',
@@ -84,10 +85,19 @@ const EmailTest = () => {
     }
 
     setIsLoading(true);
+    setLastError(null);
     
     try {
       // Log all email settings before sending
       const settings = logEmailSettings();
+      
+      console.log('🚀 Attempting to send test email...');
+      console.log('📧 Email payload:', {
+        to: testEmail.to,
+        subject: testEmail.subject,
+        type: 'contact',
+        name: profile?.name || user?.email || 'Test User'
+      });
       
       // Send the test email
       const result = await sendEmail({
@@ -98,16 +108,28 @@ const EmailTest = () => {
         name: profile?.name || user?.email || 'Test User'
       });
 
+      console.log('📬 Email service response:', result);
+
       if (result.success) {
         toast.success('Test email sent successfully!');
-        console.log('Email sent successfully:', result);
+        console.log('✅ Email sent successfully:', result);
+        setLastError(null);
       } else {
-        toast.error(`Failed to send email: ${result.message}`);
-        console.error('Email sending failed:', result);
+        const errorMsg = `Failed to send email: ${result.message}`;
+        toast.error(errorMsg);
+        setLastError(result.message);
+        console.error('❌ Email sending failed:', result);
       }
     } catch (error: any) {
-      console.error('Error sending test email:', error);
-      toast.error(`Error: ${error.message}`);
+      const errorMsg = `Error: ${error.message}`;
+      console.error('💥 Exception sending test email:', error);
+      console.error('Error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
+      toast.error(errorMsg);
+      setLastError(error.message);
     } finally {
       setIsLoading(false);
     }
@@ -126,6 +148,24 @@ const EmailTest = () => {
               Test email functionality and view configuration details
             </p>
           </div>
+
+          {/* Error Display */}
+          {lastError && (
+            <Card className="mb-6 border-red-200 bg-red-50">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-red-700">
+                  <AlertTriangle className="h-5 w-5" />
+                  Last Error
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-red-600 font-mono">{lastError}</p>
+                <p className="text-xs text-red-500 mt-2">
+                  Check the browser console for more details
+                </p>
+              </CardContent>
+            </Card>
+          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Email Test Form */}
@@ -177,6 +217,11 @@ const EmailTest = () => {
                 >
                   {isLoading ? 'Sending...' : 'Send Test Email'}
                 </Button>
+                
+                <div className="text-xs text-gray-500 space-y-1">
+                  <p>💡 <strong>Tip:</strong> If email fails, check that EMAIL_USER and EMAIL_PASSWORD are set in Supabase secrets</p>
+                  <p>🔐 Gmail requires an app-specific password (not your regular password)</p>
+                </div>
               </CardContent>
             </Card>
 
@@ -272,6 +317,11 @@ const EmailTest = () => {
                 <p>• From address will be: The-eVoting &lt;EMAIL_USER@gmail.com&gt;</p>
                 <p>• Make sure these secrets are properly configured in your Supabase project</p>
                 <p>• Gmail requires an app-specific password for SMTP authentication</p>
+                
+                <p className="mt-4"><strong>Common Issues:</strong></p>
+                <p>• "Failed to send a request to the Edge Function" = Missing secrets</p>
+                <p>• "Authentication failed" = Wrong email/password combination</p>
+                <p>• "535 authentication failed" = Need app-specific password for Gmail</p>
               </div>
             </CardContent>
           </Card>
