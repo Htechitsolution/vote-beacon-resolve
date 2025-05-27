@@ -24,14 +24,12 @@ serve(async (req) => {
   }
 
   try {
-    const email_user = "htech.walit@gmail.com";
-    const email_password = "eujzcagbfcxagsvj";
-
-    //const email_user = "Deno.env.get("EMAIL_USER")";
-    //const email_password = Deno.env.get("EMAIL_PASSWORD");
+    // Get email credentials from environment
+    const email_user = Deno.env.get("EMAIL_USER");
+    const email_password = Deno.env.get("EMAIL_PASSWORD");
     
     if (!email_user || !email_password) {
-      console.error("Missing email credentials", { user: email_user ? "set" : "missing", password: email_password ? "set" : "missing" });
+      console.error("Missing email credentials");
       throw new Error("Email service credentials not configured");
     }
 
@@ -40,7 +38,7 @@ serve(async (req) => {
 
     console.log(`Processing ${type} email to ${to}`);
 
-    // Setup SMTP client with more detailed configuration
+    // Setup SMTP client
     const client = new SmtpClient({
       connection: {
         hostname: "smtp.gmail.com",
@@ -51,7 +49,7 @@ serve(async (req) => {
           password: email_password,
         },
       },
-      debug: true, // Enable debug logging
+      debug: true,
     });
 
     // Send the email
