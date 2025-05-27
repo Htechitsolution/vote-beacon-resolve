@@ -27,11 +27,8 @@ serve(async (req) => {
     console.log("=== EMAIL SERVICE STARTED ===");
     
     // Get email credentials from environment
-    //const email_user = Deno.env.get("EMAIL_USER");
-    //const email_password = Deno.env.get("EMAIL_PASSWORD");
-
-    const email_user = 'htech.walit@gmail.com/;
-    const email_password = 'eujzcagbfcxagsvj';
+    const email_user = Deno.env.get("EMAIL_USER");
+    const email_password = Deno.env.get("EMAIL_PASSWORD");
     
     console.log("Email user configured:", email_user ? "✅ YES" : "❌ NO");
     console.log("Email password configured:", email_password ? "✅ YES" : "❌ NO");
