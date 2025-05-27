@@ -1,6 +1,5 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { SMTPClient } from "https://deno.land/x/smtp@v0.7.0/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,6 +12,14 @@ interface VoterOtpRequest {
   otp: string;
   projectName: string;
   votingLink: string;
+}
+
+interface EmailPayload {
+  to: string;
+  subject: string;
+  body: string;
+  type: string;
+  name?: string;
 }
 
 serve(async (req) => {
@@ -37,57 +44,51 @@ serve(async (req) => {
       );
     }
     
-    // Log OTP for testing purposes
-    console.log(`Sending OTP email to ${email} with code: ${otp}`);
+    console.log(`Preparing to send OTP email to ${email} with code: ${otp}`);
     
-    // Get email credentials from environment variables
-    const email_user = Deno.env.get("EMAIL_USER") || "noreply@htechsolutions.in";
-    const email_password = Deno.env.get("EMAIL_PASSWORD") || "TqB(ttf3";
-
-    if (!email_user || !email_password) {
-      throw new Error("Email credentials are not configured");
-    }
-
-    // Set up SMTP client
-    const client = new SMTPClient({
-      connection: {
-        hostname: "us2.smtp.mailhostbox.com",
-        port: 25,
-        tls: false,
-        auth: {
-          username: email_user,
-          password: email_password,
-        },
-      },
-    });
-
-    // Create HTML email with OTP
-    const htmlBody = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
-        <h2 style="color: #4f46e5;">Your Login Code for ${projectName}</h2>
-        <p>Hello ${name || 'Voter'},</p>
-        <p>Please use the following code to log in to the ${projectName} voting platform:</p>
-        <div style="background-color: #f5f5f5; padding: 15px; text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 5px; border-radius: 4px; margin: 20px 0;">
-          ${otp}
-        </div>
-        <p>This code will expire in 5 minutes.</p>
-        <p>If you did not request this code, please ignore this email.</p>
-        <p style="margin-top: 30px; font-size: 12px; color: #666;">
-          This is an automated message. Please do not reply to this email.
-        </p>
+    // Create email HTML body
+    const emailBody = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2>Your Login Details for ${projectName}</h2>
+        <p>Hello ${name},</p>
+        <p>You have been invited to vote in: <strong>${projectName}</strong></p>
+        <p>Your one-time password is: <strong style="font-size: 20px;">${otp}</strong></p>
+        <p>Please click the link below to access the voting portal:</p>
+        <p><a href="${votingLink}" style="display: inline-block; background-color: #4CAF50; color: white; padding: 10px 15px; text-decoration: none; border-radius: 5px;">Go to Voting Portal</a></p>
+        <p>If the button above doesn't work, copy and paste this URL into your browser:</p>
+        <p>${votingLink}</p>
+        <p>This login code will expire in 30 minutes.</p>
+        <p>Thank you,<br>The-eVoting Team</p>
       </div>
     `;
 
-    // Send the email
-    await client.send({
-      from: `The-eVoting <${email_user}>`,
+    // Send the email using our centralized email service
+    const emailPayload: EmailPayload = {
       to: email,
-      subject: `Your Login Code for ${projectName}`,
-      content: "text/html",
-      html: htmlBody,
-    });
-
-    await client.close();
+      subject: `Your login code for ${projectName}`,
+      body: emailBody,
+      type: "voter_otp",
+      name: name
+    };
+    
+    // Call the email-service function
+    const { data, error } = await fetch(
+      `${Deno.env.get("SUPABASE_URL")}/functions/v1/email-service`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`
+        },
+        body: JSON.stringify(emailPayload)
+      }
+    ).then(res => res.json());
+    
+    if (error) {
+      throw new Error(`Email service error: ${error.message}`);
+    }
+    
+    console.log("Email sent successfully:", data);
     
     return new Response(
       JSON.stringify({ 

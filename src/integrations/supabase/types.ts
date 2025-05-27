@@ -244,11 +244,14 @@ export type Database = {
       }
       voters: {
         Row: {
+          agenda_id: string | null
           company_name: string | null
           created_at: string
           email: string
+          force_reset_password: boolean | null
           id: string
           name: string | null
+          password: string | null
           project_id: string
           status: string | null
           updated_at: string
@@ -256,11 +259,14 @@ export type Database = {
           voting_weight: number | null
         }
         Insert: {
+          agenda_id?: string | null
           company_name?: string | null
           created_at?: string
           email: string
+          force_reset_password?: boolean | null
           id?: string
           name?: string | null
+          password?: string | null
           project_id: string
           status?: string | null
           updated_at?: string
@@ -268,11 +274,14 @@ export type Database = {
           voting_weight?: number | null
         }
         Update: {
+          agenda_id?: string | null
           company_name?: string | null
           created_at?: string
           email?: string
+          force_reset_password?: boolean | null
           id?: string
           name?: string | null
+          password?: string | null
           project_id?: string
           status?: string | null
           updated_at?: string
@@ -280,6 +289,13 @@ export type Database = {
           voting_weight?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "voters_agenda_id_fkey"
+            columns: ["agenda_id"]
+            isOneToOne: false
+            referencedRelation: "agendas"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "voters_project_id_fkey"
             columns: ["project_id"]
