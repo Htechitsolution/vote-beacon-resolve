@@ -246,10 +246,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           name: 'Voter',
           company_name: null,
           role: 'voter' as any,
-          subscription_plan: null,
           credits: 0,
           created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
+          communications_address: null,
+          ibc_registration_number: null
         };
         
         // Set the voter profile
