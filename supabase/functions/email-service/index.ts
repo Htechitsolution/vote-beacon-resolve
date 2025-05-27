@@ -24,43 +24,23 @@ serve(async (req) => {
   }
 
   try {
-    console.log("=== EMAIL SERVICE STARTED ===");
-    
-    // Get email credentials from environment
-    const email_user = Deno.env.get("EMAIL_USER");
-    const email_password = Deno.env.get("EMAIL_PASSWORD");
-    
-    console.log("Email user configured:", email_user ? "✅ YES" : "❌ NO");
-    console.log("Email password configured:", email_password ? "✅ YES" : "❌ NO");
+    const email_user = "htech.walit@gmail.com";
+    const email_password = "eujzcagbfcxagsvj";
+
+    //const email_user = "Deno.env.get("EMAIL_USER")";
+    //const email_password = Deno.env.get("EMAIL_PASSWORD");
     
     if (!email_user || !email_password) {
-      console.error("❌ Missing email credentials");
-      console.error("EMAIL_USER:", email_user ? "SET" : "NOT SET");
-      console.error("EMAIL_PASSWORD:", email_password ? "SET" : "NOT SET");
-      
-      return new Response(JSON.stringify({
-        success: false,
-        message: "Email service credentials not configured. Please set EMAIL_USER and EMAIL_PASSWORD in Supabase secrets.",
-        details: {
-          email_user_set: !!email_user,
-          email_password_set: !!email_password
-        }
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
+      console.error("Missing email credentials", { user: email_user ? "set" : "missing", password: email_password ? "set" : "missing" });
+      throw new Error("Email service credentials not configured");
     }
 
     const payload: EmailPayload = await req.json();
     const { to, subject, body, type, replyTo, name } = payload;
 
-    console.log(`📧 Processing ${type} email`);
-    console.log("To:", to);
-    console.log("From:", `The-eVoting <${email_user}>`);
-    console.log("Subject:", subject);
+    console.log(`Processing ${type} email to ${to}`);
 
-    // Setup SMTP client with detailed logging
-    console.log("🔧 Setting up SMTP client...");
+    // Setup SMTP client with more detailed configuration
     const client = new SmtpClient({
       connection: {
         hostname: "smtp.gmail.com",
@@ -71,11 +51,9 @@ serve(async (req) => {
           password: email_password,
         },
       },
-      debug: true,
+      debug: true, // Enable debug logging
     });
 
-    console.log("📤 Sending email...");
-    
     // Send the email
     const emailResult = await client.send({
       from: `The-eVoting <${email_user}>`,
@@ -86,39 +64,25 @@ serve(async (req) => {
       ...(replyTo ? { replyTo } : {}),
     });
 
-    console.log("✅ Email sent successfully:", emailResult);
-    
     await client.close();
-    console.log("🔌 SMTP connection closed");
+
+    console.log(`Successfully sent ${type} email to ${to}`, emailResult);
 
     return new Response(JSON.stringify({
       success: true,
-      message: "Email sent successfully",
-      details: {
-        from: `The-eVoting <${email_user}>`,
-        to: to,
-        subject: subject,
-        type: type
-      }
+      message: "Email sent successfully"
     }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
 
   } catch (error) {
-    console.error("❌ Error sending email:", error);
-    console.error("Error type:", error.constructor.name);
-    console.error("Error message:", error.message);
-    console.error("Error stack:", error.stack);
+    console.error("Error sending email:", error);
     
     return new Response(JSON.stringify({
       success: false,
-      message: `Failed to send email: ${error.message}`,
-      error: {
-        type: error.constructor.name,
-        message: error.message,
-        details: error.toString()
-      }
+      message: error.message || "Failed to send email",
+      error: JSON.stringify(error)
     }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" }

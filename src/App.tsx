@@ -22,7 +22,6 @@ import CheckoutPage from './pages/Checkout';
 import VoterLoginPage from './pages/VoterLogin';
 import VoterVerifyPage from './pages/VoterVerify';
 import VoterDashboardPage from './pages/VoterDashboard';
-import EmailTest from './pages/EmailTest';
 import ProtectedRoute from './components/ProtectedRoute';
 import SuperAdminRoute from './components/SuperAdminRoute';
 
@@ -40,7 +39,6 @@ function App() {
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/contact-us" element={<ContactUsPage />} />
         <Route path="/checkout" element={<CheckoutPage />} />
-        <Route path="/email-test" element={<EmailTest />} />
         
         {/* Protected routes */}
         <Route element={<ProtectedRoute />}>

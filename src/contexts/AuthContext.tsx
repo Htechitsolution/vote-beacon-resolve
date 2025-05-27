@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Session, User } from '@supabase/supabase-js';
@@ -121,9 +120,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (error) throw error;
       
-      // For admin login only
-      toast.success('Signed in successfully!');
-      navigate('/projects');
+      if (role === 'voter') {
+        // For voter login - redirect to voter dashboard
+        toast.success('Signed in successfully!');
+        navigate('/voter-dashboard');
+      } else {
+        // For admin login
+        toast.success('Signed in successfully!');
+        navigate('/projects');
+      }
     } catch (error: any) {
       console.error('Error signing in:', error.message);
       toast.error(error.message || 'Failed to sign in');
@@ -185,11 +190,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(null);
       setUser(null);
       setProfile(null);
-      
-      // Clear voter session data
-      setPendingVoterEmail(null);
-      setPendingVoterOTP(null);
-      
       toast.success('Signed out successfully');
       navigate('/login');
     } catch (error: any) {
@@ -239,46 +239,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       // For testing - allow direct match with stored OTP
       if (enteredOTP === pendingVoterOTP) {
-        // Create a temporary voter profile without using Supabase auth
-        const tempVoterProfile: Profile = {
-          id: crypto.randomUUID(),
-          email: pendingVoterEmail,
-          name: 'Voter',
-          company_name: null,
-          role: 'voter' as any,
-          credits: 0,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          communications_address: null,
-          ibc_registration_number: null
-        };
-        
-        // Set the voter profile
-        setProfile(tempVoterProfile);
-        
-        // Create a temporary user object
-        const tempUser = {
-          id: tempVoterProfile.id,
-          email: pendingVoterEmail,
-          aud: 'authenticated',
-          role: 'authenticated',
-          email_confirmed_at: new Date().toISOString(),
-          phone: '',
-          confirmed_at: new Date().toISOString(),
-          last_sign_in_at: new Date().toISOString(),
-          app_metadata: {},
-          user_metadata: {},
-          identities: [],
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        } as User;
-        
-        setUser(tempUser);
-        
         // Clear pending data
         setPendingVoterEmail(null);
         setPendingVoterOTP(null);
-        
         return true;
       }
       
