@@ -28,8 +28,8 @@ const EmailTest = () => {
       profileRole: profile?.role || 'Not available',
       
       // Email Configuration (from environment/system)
-      emailUser: 'Environment variable EMAIL_USER (hidden for security)',
-      emailPassword: 'Environment variable EMAIL_PASSWORD (hidden for security)',
+      emailUser: 'EMAIL_USER environment variable (hidden for security)',
+      emailPassword: 'EMAIL_PASSWORD environment variable (hidden for security)',
       
       // SMTP Settings (based on Gmail configuration in edge function)
       smtpServer: 'smtp.gmail.com',
@@ -43,7 +43,7 @@ const EmailTest = () => {
       rejectUnauthorized: true,
       
       // Email Details
-      from: `The-eVoting <${user?.email || 'system@the-evoting.com'}>`,
+      from: 'The-eVoting <EMAIL_USER@gmail.com> (actual EMAIL_USER will be used)',
       to: testEmail.to,
       subject: testEmail.subject,
       
@@ -57,12 +57,22 @@ const EmailTest = () => {
       edgeFunctionEndpoint: 'email-service',
       edgeFunctionMethod: 'POST',
       corsEnabled: true,
-      jwtVerification: false // Based on config.toml
+      jwtVerification: false, // Based on config.toml
+      
+      // Important Notes
+      notes: [
+        'The actual EMAIL_USER and EMAIL_PASSWORD are stored in Supabase secrets',
+        'Edge function uses EMAIL_USER as the from address',
+        'Display name will be "The-eVoting" but sender email comes from EMAIL_USER secret',
+        'Gmail SMTP requires app-specific password or OAuth2'
+      ]
     };
 
     console.log('========== EMAIL CONFIGURATION LOG ==========');
     console.log(JSON.stringify(emailSettings, null, 2));
     console.log('=============================================');
+    console.log('IMPORTANT: The edge function will use the actual EMAIL_USER and EMAIL_PASSWORD from Supabase secrets');
+    console.log('Make sure EMAIL_USER and EMAIL_PASSWORD are properly set in your Supabase project secrets');
     
     return emailSettings;
   };
@@ -198,6 +208,16 @@ const EmailTest = () => {
                   </div>
                   
                   <div>
+                    <Label className="text-sm font-medium text-gray-600">From Email:</Label>
+                    <p className="text-sm font-mono bg-gray-100 p-2 rounded">
+                      The-eVoting &lt;EMAIL_USER&gt;
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Actual EMAIL_USER from Supabase secrets
+                    </p>
+                  </div>
+                  
+                  <div>
                     <Label className="text-sm font-medium text-gray-600">SMTP Server:</Label>
                     <p className="text-sm font-mono bg-gray-100 p-2 rounded">smtp.gmail.com</p>
                   </div>
@@ -214,7 +234,7 @@ const EmailTest = () => {
                   
                   <div>
                     <Label className="text-sm font-medium text-gray-600">Authentication:</Label>
-                    <p className="text-sm font-mono bg-gray-100 p-2 rounded">Username/Password</p>
+                    <p className="text-sm font-mono bg-gray-100 p-2 rounded">EMAIL_USER / EMAIL_PASSWORD</p>
                   </div>
                   
                   <div>
@@ -237,15 +257,21 @@ const EmailTest = () => {
           {/* Instructions */}
           <Card className="mt-6">
             <CardHeader>
-              <CardTitle>Instructions</CardTitle>
+              <CardTitle>Instructions & Configuration Notes</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-2 text-sm text-gray-600">
+                <p><strong>Testing:</strong></p>
                 <p>1. Enter a recipient email address in the form above</p>
                 <p>2. Customize the subject and message if needed</p>
                 <p>3. Click "Send Test Email" to send the email</p>
                 <p>4. Check the browser console for detailed configuration logs</p>
-                <p>5. Use "Log Full Configuration" to view all email settings</p>
+                
+                <p className="mt-4"><strong>Email Configuration:</strong></p>
+                <p>• The edge function uses EMAIL_USER and EMAIL_PASSWORD from Supabase secrets</p>
+                <p>• From address will be: The-eVoting &lt;EMAIL_USER@gmail.com&gt;</p>
+                <p>• Make sure these secrets are properly configured in your Supabase project</p>
+                <p>• Gmail requires an app-specific password for SMTP authentication</p>
               </div>
             </CardContent>
           </Card>
