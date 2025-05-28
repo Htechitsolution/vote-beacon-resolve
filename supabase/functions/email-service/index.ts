@@ -24,7 +24,7 @@ serve(async (req) => {
   }
 
   try {
-    const email_user = "Deno.env.get("EMAIL_USER")";
+    const email_user = Deno.env.get("EMAIL_USER");
     const email_password = Deno.env.get("EMAIL_PASSWORD");
     
     if (!email_user || !email_password) {
@@ -37,7 +37,7 @@ serve(async (req) => {
 
     console.log(`Processing ${type} email to ${to}`);
 
-    // Setup SMTP client with more detailed configuration
+    // Setup SMTP client with Gmail configuration
     const client = new SmtpClient({
       connection: {
         hostname: "smtp.gmail.com",
@@ -48,7 +48,7 @@ serve(async (req) => {
           password: email_password,
         },
       },
-      debug: true, // Enable debug logging
+      debug: true,
     });
 
     // Send the email

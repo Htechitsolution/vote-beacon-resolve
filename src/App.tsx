@@ -22,6 +22,7 @@ import CheckoutPage from './pages/Checkout';
 import VoterLoginPage from './pages/VoterLogin';
 import VoterVerifyPage from './pages/VoterVerify';
 import VoterDashboardPage from './pages/VoterDashboard';
+import EmailTest from './pages/EmailTest';
 import ProtectedRoute from './components/ProtectedRoute';
 import SuperAdminRoute from './components/SuperAdminRoute';
 
