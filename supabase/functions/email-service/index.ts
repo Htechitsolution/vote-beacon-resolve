@@ -37,34 +37,35 @@ serve(async (req) => {
 
     console.log(`Processing ${type} email to ${to}`);
 
-    // Setup SMTP client with Gmail configuration
+    // Setup SMTP client with proper Gmail configuration
     const client = new SmtpClient({
       connection: {
         hostname: "smtp.gmail.com",
         port: 587,
-        tls: false, // Start with no TLS, then upgrade with STARTTLS
+        tls: true, // Enable TLS
         auth: {
           username: email_user,
           password: email_password,
         },
       },
-      debug: true,
     });
 
     try {
       console.log("Connecting to Gmail SMTP...");
       
+      // Connect to the SMTP server
+      await client.connect();
+      
       // Send the email
-      const emailResult = await client.send({
-        from: `The-eVoting <${email_user}>`,
+      await client.send({
+        from: email_user,
         to: to,
         subject: subject,
-        content: "text/html",
+        content: body,
         html: body,
-        ...(replyTo ? { replyTo } : {}),
       });
 
-      console.log(`Successfully sent ${type} email to ${to}`, emailResult);
+      console.log(`Successfully sent ${type} email to ${to}`);
 
       return new Response(JSON.stringify({
         success: true,
