@@ -1,6 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { SmtpClient } from "https://deno.land/x/smtp@v0.7.0/mod.ts";
+import nodemailer from "npm:nodemailer@6.9.7";
 
 // Define CORS headers
 const corsHeaders = {
@@ -37,54 +37,38 @@ serve(async (req) => {
 
     console.log(`Processing ${type} email to ${to}`);
 
-    // Setup SMTP client with proper Gmail configuration
-    const client = new SmtpClient({
-      connection: {
-        hostname: "smtp.gmail.com",
-        port: 587,
-        tls: true, // Enable TLS
-        auth: {
-          username: email_user,
-          password: email_password,
-        },
+    // Create nodemailer transporter with Gmail configuration
+    const transporter = nodemailer.createTransporter({
+      service: 'gmail',
+      auth: {
+        user: email_user,
+        pass: email_password,
       },
     });
 
-    try {
-      console.log("Connecting to Gmail SMTP...");
-      
-      // Connect to the SMTP server
-      await client.connect();
-      
-      // Send the email
-      await client.send({
-        from: email_user,
-        to: to,
-        subject: subject,
-        content: body,
-        html: body,
-      });
+    // Verify the connection configuration
+    await transporter.verify();
+    console.log("Gmail SMTP connection verified successfully");
 
-      console.log(`Successfully sent ${type} email to ${to}`);
+    // Send the email
+    const info = await transporter.sendMail({
+      from: `"The-eVoting" <${email_user}>`,
+      to: to,
+      subject: subject,
+      html: body,
+      replyTo: replyTo || email_user,
+    });
 
-      return new Response(JSON.stringify({
-        success: true,
-        message: "Email sent successfully"
-      }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
+    console.log(`Successfully sent ${type} email to ${to}. Message ID: ${info.messageId}`);
 
-    } catch (smtpError) {
-      console.error("SMTP Error details:", smtpError);
-      throw new Error(`SMTP Error: ${smtpError.message}`);
-    } finally {
-      try {
-        await client.close();
-      } catch (closeError) {
-        console.log("Error closing SMTP client:", closeError);
-      }
-    }
+    return new Response(JSON.stringify({
+      success: true,
+      message: "Email sent successfully",
+      messageId: info.messageId
+    }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
+    });
 
   } catch (error) {
     console.error("Error sending email:", error);

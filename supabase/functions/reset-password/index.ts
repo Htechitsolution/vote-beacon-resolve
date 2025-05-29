@@ -1,5 +1,6 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { SmtpClient } from "https://deno.land/x/smtp@v0.7.0/mod.ts";
+import nodemailer from "npm:nodemailer@6.9.7";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -28,18 +29,13 @@ serve(async (req) => {
     const payload: ResetPasswordPayload = await req.json();
     const { email, resetLink } = payload;
 
-    const client = new SmtpClient({
-      connection: {
-        hostname: "smtp.gmail.com",
-        port: 587,
-        tls: false,
-        starttls: true,
-        auth: {
-          username: email_user,
-          password: email_password,
-        },
+    // Create nodemailer transporter
+    const transporter = nodemailer.createTransporter({
+      service: 'gmail',
+      auth: {
+        user: email_user,
+        pass: email_password,
       },
-      debug: true,
     });
 
     const htmlBody = `
@@ -58,23 +54,20 @@ serve(async (req) => {
       </div>
     `;
 
-    try {
-      await client.send({
-        from: `The-eVoting <${email_user}>`,
-        to: email,
-        subject: "Password Reset Request",
-        html: htmlBody,
-      });
-    } catch (emailError) {
-      console.error("SMTP error details:", emailError);
-      throw emailError;
-    } finally {
-      await client.close();
-    }
+    // Send the email using nodemailer
+    const info = await transporter.sendMail({
+      from: `"The-eVoting" <${email_user}>`,
+      to: email,
+      subject: "Password Reset Request",
+      html: htmlBody,
+    });
+
+    console.log("Password reset email sent successfully. Message ID:", info.messageId);
 
     return new Response(JSON.stringify({
       success: true,
-      message: "Password reset email sent successfully"
+      message: "Password reset email sent successfully",
+      messageId: info.messageId
     }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
