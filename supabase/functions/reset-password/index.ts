@@ -1,10 +1,10 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { SmtpClient } from "https://deno.land/x/smtp@v0.7.0/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
 interface ResetPasswordPayload {
@@ -13,7 +13,6 @@ interface ResetPasswordPayload {
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -23,30 +22,26 @@ serve(async (req) => {
     const email_password = Deno.env.get("EMAIL_PASSWORD");
 
     if (!email_user || !email_password) {
-      console.error("Missing email credentials", { user: email_user ? "set" : "missing", password: email_password ? "set" : "missing" });
       throw new Error("Email service credentials not configured");
     }
 
     const payload: ResetPasswordPayload = await req.json();
     const { email, resetLink } = payload;
 
-    console.log(`Sending password reset email to ${email} with link ${resetLink}`);
-
-    // Setup SMTP client with more detailed configuration
     const client = new SmtpClient({
       connection: {
         hostname: "smtp.gmail.com",
         port: 587,
         tls: false,
+        starttls: true,
         auth: {
           username: email_user,
           password: email_password,
         },
       },
-      debug: true, // Enable debug logging
+      debug: true,
     });
 
-    // HTML email template
     const htmlBody = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
         <h2 style="color: #4f46e5;">Password Reset Request</h2>
@@ -64,16 +59,12 @@ serve(async (req) => {
     `;
 
     try {
-      // Send the email
-      console.log("Sending email...");
-      const sendResult = await client.send({
+      await client.send({
         from: `The-eVoting <${email_user}>`,
         to: email,
         subject: "Password Reset Request",
-        content: "text/html",
         html: htmlBody,
       });
-      console.log("Email send result:", sendResult);
     } catch (emailError) {
       console.error("SMTP error details:", emailError);
       throw emailError;
@@ -81,25 +72,22 @@ serve(async (req) => {
       await client.close();
     }
 
-    console.log(`Successfully sent password reset email to ${email}`);
-
     return new Response(JSON.stringify({
       success: true,
       message: "Password reset email sent successfully"
     }), {
       status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" }
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
 
   } catch (error) {
     console.error("Error sending password reset email:", error);
-    
     return new Response(JSON.stringify({
       success: false,
       message: error.message || "Failed to send password reset email"
     }), {
       status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" }
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
