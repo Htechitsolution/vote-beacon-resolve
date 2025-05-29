@@ -1,6 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import nodemailer from "npm:nodemailer@6.9.7";
+import { SmtpClient } from "https://deno.land/x/smtp@v0.7.0/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -29,12 +29,16 @@ serve(async (req) => {
     const payload: ResetPasswordPayload = await req.json();
     const { email, resetLink } = payload;
 
-    // Create nodemailer transporter
-    const transporter = nodemailer.createTransporter({
-      service: 'gmail',
-      auth: {
-        user: email_user,
-        pass: email_password,
+    // Create SMTP client with proper Gmail configuration
+    const client = new SmtpClient({
+      connection: {
+        hostname: "smtp.gmail.com",
+        port: 465,
+        tls: true,
+        auth: {
+          username: email_user,
+          password: email_password,
+        },
       },
     });
 
@@ -54,24 +58,39 @@ serve(async (req) => {
       </div>
     `;
 
-    // Send the email using nodemailer
-    const info = await transporter.sendMail({
-      from: `"The-eVoting" <${email_user}>`,
-      to: email,
-      subject: "Password Reset Request",
-      html: htmlBody,
-    });
+    try {
+      console.log("Connecting to Gmail SMTP for password reset...");
+      
+      // Connect and send email
+      await client.connect();
+      console.log("Connected to Gmail SMTP successfully");
+      
+      await client.send({
+        from: `The-eVoting <${email_user}>`,
+        to: email,
+        subject: "Password Reset Request",
+        content: htmlBody,
+        html: htmlBody,
+      });
 
-    console.log("Password reset email sent successfully. Message ID:", info.messageId);
+      console.log("Password reset email sent successfully");
 
-    return new Response(JSON.stringify({
-      success: true,
-      message: "Password reset email sent successfully",
-      messageId: info.messageId
-    }), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+      return new Response(JSON.stringify({
+        success: true,
+        message: "Password reset email sent successfully"
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+
+    } finally {
+      try {
+        await client.close();
+        console.log("SMTP connection closed");
+      } catch (closeError) {
+        console.log("Error closing SMTP client:", closeError);
+      }
+    }
 
   } catch (error) {
     console.error("Error sending password reset email:", error);
