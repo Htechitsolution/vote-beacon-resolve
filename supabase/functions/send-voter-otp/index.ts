@@ -14,14 +14,6 @@ interface VoterOtpRequest {
   votingLink: string;
 }
 
-interface EmailPayload {
-  to: string;
-  subject: string;
-  body: string;
-  type: string;
-  name?: string;
-}
-
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
@@ -46,32 +38,7 @@ serve(async (req) => {
     
     console.log(`Preparing to send OTP email to ${email} with code: ${otp}`);
     
-    // Create email HTML body
-    const emailBody = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2>Your Login Details for ${projectName}</h2>
-        <p>Hello ${name},</p>
-        <p>You have been invited to vote in: <strong>${projectName}</strong></p>
-        <p>Your one-time password is: <strong style="font-size: 20px;">${otp}</strong></p>
-        <p>Please click the link below to access the voting portal:</p>
-        <p><a href="${votingLink}" style="display: inline-block; background-color: #4CAF50; color: white; padding: 10px 15px; text-decoration: none; border-radius: 5px;">Go to Voting Portal</a></p>
-        <p>If the button above doesn't work, copy and paste this URL into your browser:</p>
-        <p>${votingLink}</p>
-        <p>This login code will expire in 30 minutes.</p>
-        <p>Thank you,<br>The-eVoting Team</p>
-      </div>
-    `;
-
-    // Send the email using our centralized email service
-    const emailPayload: EmailPayload = {
-      to: email,
-      subject: `Your login code for ${projectName}`,
-      body: emailBody,
-      type: "voter_otp",
-      name: name
-    };
-    
-    // Call the email-service function
+    // Call the centralized email-service function
     const { data, error } = await fetch(
       `${Deno.env.get("SUPABASE_URL")}/functions/v1/email-service`,
       {
@@ -80,7 +47,15 @@ serve(async (req) => {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`
         },
-        body: JSON.stringify(emailPayload)
+        body: JSON.stringify({
+          to: email,
+          subject: `Your login code for ${projectName}`,
+          type: "voter_otp",
+          name: name,
+          otp: otp,
+          projectName: projectName,
+          votingLink: votingLink
+        })
       }
     ).then(res => res.json());
     

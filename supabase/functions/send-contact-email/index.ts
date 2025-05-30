@@ -1,6 +1,5 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { SMTPClient } from "https://deno.land/x/smtp@v0.7.0/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -20,32 +19,17 @@ serve(async (req) => {
   }
 
   try {
-    const email_user = Deno.env.get("EMAIL_USER");
-    const email_password = Deno.env.get("EMAIL_PASSWORD");
-    const admin_email = Deno.env.get("ADMIN_EMAIL") || email_user; // Email to receive contact form messages
+    const admin_email = Deno.env.get("ADMIN_EMAIL") || Deno.env.get("EMAIL_USER");
 
-    if (!email_user || !email_password) {
-      console.error("Missing email credentials");
-      throw new Error("Email service credentials not configured");
+    if (!admin_email) {
+      console.error("Missing admin email");
+      throw new Error("Admin email not configured");
     }
 
     const payload: ContactEmailPayload = await req.json();
     const { name, email, message } = payload;
 
     console.log(`Processing contact form submission from ${email}`);
-
-    // Setup SMTP client
-    const client = new SMTPClient({
-      connection: {
-        hostname: "smtp.gmail.com",
-        port: 587,
-        tls: false,
-        auth: {
-          username: email_user,
-          password: email_password,
-        },
-      },
-    });
 
     // HTML email template for admin
     const adminHtmlBody = `
@@ -76,26 +60,50 @@ serve(async (req) => {
       </div>
     `;
 
-    // Send the email to admin
-    await client.send({
-      from: `The-eVoting <${email_user}>`,
-      to: admin_email,
-      subject: `Contact Form: Message from ${name}`,
-      content: "text/html",
-      html: adminHtmlBody,
-      replyTo: email,
-    });
+    // Send the email to admin using centralized email service
+    const { data: adminEmailData, error: adminEmailError } = await fetch(
+      `${Deno.env.get("SUPABASE_URL")}/functions/v1/email-service`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`
+        },
+        body: JSON.stringify({
+          to: admin_email,
+          subject: `Contact Form: Message from ${name}`,
+          body: adminHtmlBody,
+          type: "contact",
+          replyTo: email
+        })
+      }
+    ).then(res => res.json());
+
+    if (adminEmailError) {
+      throw new Error(`Admin email error: ${adminEmailError.message}`);
+    }
 
     // Send confirmation email to user
-    await client.send({
-      from: `The-eVoting <${email_user}>`,
-      to: email,
-      subject: "We've Received Your Message - The-eVoting",
-      content: "text/html",
-      html: confirmationHtmlBody,
-    });
+    const { data: userEmailData, error: userEmailError } = await fetch(
+      `${Deno.env.get("SUPABASE_URL")}/functions/v1/email-service`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`
+        },
+        body: JSON.stringify({
+          to: email,
+          subject: "We've Received Your Message - The-eVoting",
+          body: confirmationHtmlBody,
+          type: "contact"
+        })
+      }
+    ).then(res => res.json());
 
-    await client.close();
+    if (userEmailError) {
+      throw new Error(`User confirmation email error: ${userEmailError.message}`);
+    }
 
     console.log(`Successfully processed contact form from ${email}`);
 
