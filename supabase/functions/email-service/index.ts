@@ -139,9 +139,14 @@ serve(async (req) => {
       }
     }
 
-    // Create SMTP client with proper Gmail configuration
-    const client = new SmtpClient({
-      connection: {
+    // Create SMTP client with CORRECTED Gmail configuration
+    const client = new SmtpClient();
+
+    try {
+      console.log("Connecting to Gmail SMTP...");
+      
+      // Connect to the SMTP server with PROPER configuration structure
+      await client.connect({
         hostname: "smtp.gmail.com",
         port: 465,
         tls: true,
@@ -149,14 +154,8 @@ serve(async (req) => {
           username: email_user,
           password: email_password,
         },
-      },
-    });
-
-    try {
-      console.log("Connecting to Gmail SMTP...");
+      });
       
-      // Connect to the SMTP server
-      await client.connect();
       console.log("Connected to Gmail SMTP successfully");
       
       // Send the email
