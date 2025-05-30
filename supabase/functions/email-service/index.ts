@@ -139,17 +139,17 @@ serve(async (req) => {
       }
     }
 
-    // Create SMTP client with CORRECTED Gmail configuration
+    // Create SMTP client with updated configuration for better compatibility
     const client = new SmtpClient();
 
     try {
-      console.log("Connecting to Gmail SMTP...");
+      console.log("Connecting to Gmail SMTP with updated configuration...");
       
-      // Connect to the SMTP server with PROPER configuration structure
+      // Use the updated connection method with explicit configuration
       await client.connect({
         hostname: "smtp.gmail.com",
-        port: 465,
-        tls: true,
+        port: 587, // Changed to port 587 (STARTTLS) instead of 465 (SSL)
+        tls: false, // Start without TLS, then upgrade
         auth: {
           username: email_user,
           password: email_password,
